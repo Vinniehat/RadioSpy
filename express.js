@@ -6,6 +6,7 @@ import chokidar from "chokidar";
 import path from "path";
 import dotenv from "dotenv";
 dotenv.config();
+import cors from "cors";
 
 const app = express();
 const httpServer = createServer(app);
@@ -35,6 +36,7 @@ const db = await mysql.createPool({
 
 
 app.use(express.json());
+app.use(cors());
 
 // --- API Endpoints ---
 app.get("/api/systems", async (req, res) => {
@@ -63,12 +65,24 @@ app.get("/api/recordings/:id/audio", async (req, res) => {
         "SELECT folder_path, filename FROM recordings WHERE id = ?",
         [req.params.id]
     );
-    if (rows.length === 0) return res.sendStatus(404);
+
+    if (!rows.length) return res.sendStatus(404);
 
     const recording = rows[0];
     const fullPath = path.join(recording.folder_path, recording.filename);
-    res.sendFile(fullPath);
+
+    // Set headers so browser can play it
+    res.setHeader("Access-Control-Allow-Origin", "*"); // or your frontend URL
+    res.setHeader("Content-Type", "audio/mpeg");
+
+    res.sendFile(fullPath, (err) => {
+        if (err) {
+            console.error("Failed to send file:", err);
+            res.sendStatus(500);
+        }
+    });
 });
+
 
 // --- Watch folder for new recordings ---
 watcher.on("add", async (filepath) => {
