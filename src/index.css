@@ -1,13 +1,13 @@
 @import "tailwindcss";
 
 :root {
+    --primary: #1DB954;        /* normal green */
+    --primary-light: #28e07c;  /* lighter green for hover */
     --bg: #121212;
-    --panel: #1e1e1e;
     --text: #e0e0e0;
-    --primary: #1DB954;
-    --secondary: #f5a623;
-    --muted: #333;
+    --accent: #f5a623;
 }
+
 
 body {
     @apply bg-[var(--bg)] text-[var(--text)] font-sans min-h-screen;
