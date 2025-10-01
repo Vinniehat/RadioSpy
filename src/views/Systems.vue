@@ -6,7 +6,8 @@
       <div
           v-for="system in systemsStore.systems"
           :key="system.id"
-          class="bg-[var(--panel)] p-4 rounded-lg shadow hover:shadow-lg hover:scale-105 transition cursor-pointer"
+          class="bg-[var(--panel)] border border-[var(--accent)] p-4 rounded-lg shadow
+                 hover:shadow-lg hover:scale-105 transition cursor-pointer"
           @click="selectSystem(system.id)"
       >
         <p class="text-[var(--text)] font-semibold text-lg">{{ system.name }}</p>
@@ -19,8 +20,8 @@
 </template>
 
 <script setup>
-import { useSystemsStore } from '../stores/systemsStore';
-import { useRouter } from 'vue-router';
+import {useSystemsStore} from '../stores/systemsStore';
+import {useRouter} from 'vue-router';
 
 const systemsStore = useSystemsStore();
 const router = useRouter();

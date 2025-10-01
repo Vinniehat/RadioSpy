@@ -1,33 +1,32 @@
+<template>
+  <div class="p-6">
+    <h1 class="text-3xl font-bold mb-6 text-[var(--primary)]">Recordings</h1>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      <div
+          v-for="rec in recordingsStore.recordings"
+          :key="rec.id"
+          class="bg-[var(--panel)] border border-[var(--accent)] p-4 rounded-lg shadow
+               hover:shadow-lg hover:scale-105 transition cursor-pointer"
+      >
+        <p class="text-[var(--text)] font-semibold text-lg">{{ rec.filename }}</p>
+        <audio
+            :src="`/recordings/${rec.id}/audio`"
+            controls
+            class="w-full mt-2"
+        ></audio>
+      </div>
+    </div>
+  </div>
+</template>
+
 <script setup>
-import { ref, onMounted } from "vue";
-import { useRecordingsStore } from "../stores/recordingsStore";
+import { useRecordingsStore } from '../stores/recordingsStore';
+import { useRoute } from 'vue-router';
+import { onMounted } from 'vue';
 
 const recordingsStore = useRecordingsStore();
-const audioBaseUrl = import.meta.env.VITE_API_BASE; // your dynamic API URL
-
-// Suppose the talkgroup ID comes from the route
-import { useRoute } from "vue-router";
 const route = useRoute();
-const talkgroupId = route.params.id;
 
-onMounted(() => {
-  recordingsStore.fetchRecordings(talkgroupId);
-  recordingsStore.connectSocket();
-});
+onMounted(() => recordingsStore.fetchRecordings(route.params.id));
 </script>
-
-<template>
-  <div class="p-4 space-y-4">
-    <h1 class="text-3xl font-bold text-primary">RadioSpy</h1>
-
-    <ul class="space-y-2">
-      <li v-for="rec in recordingsStore.recordings" :key="rec.id"
-          class="p-2 border rounded-md shadow hover:shadow-lg transition">
-        <p class="font-medium">{{ rec.filename }}</p>
-        <audio controls class="w-full mt-2"
-               :src="`${audioBaseUrl}/recordings/${rec.id}/audio`"></audio>
-      </li>
-    </ul>
-  </div>
-
-</template>
