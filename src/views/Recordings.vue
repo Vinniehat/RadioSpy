@@ -17,14 +17,17 @@ onMounted(() => {
 </script>
 
 <template>
-  <div>
-    <h2>Recordings</h2>
-    <ul>
-      <li v-for="rec in recordingsStore.recordings" :key="rec.id">
-        <p>{{ rec.filename }}</p>
-        <!-- Use the dynamic URL -->
-        <audio controls :src="`${audioBaseUrl}/recordings/${rec.id}/audio`"></audio>
+  <div class="p-4 space-y-4">
+    <h1 class="text-3xl font-bold text-primary">RadioSpy</h1>
+
+    <ul class="space-y-2">
+      <li v-for="rec in recordingsStore.recordings" :key="rec.id"
+          class="p-2 border rounded-md shadow hover:shadow-lg transition">
+        <p class="font-medium">{{ rec.filename }}</p>
+        <audio controls class="w-full mt-2"
+               :src="`${audioBaseUrl}/recordings/${rec.id}/audio`"></audio>
       </li>
     </ul>
   </div>
+
 </template>
