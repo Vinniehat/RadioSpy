@@ -11,15 +11,18 @@
           @click="selectTalkgroup(tg.id)"
       >
         <p class="text-[var(--text)] font-semibold text-lg">{{ tg.name }}</p>
+        <p class="text-[var(--muted)] text-sm mt-1">
+          {{ tg.recordingCount ?? '—' }} recordings
+        </p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { useTalkgroupsStore } from '../stores/talkgroupsStore';
-import { useRouter, useRoute } from 'vue-router';
-import { onMounted } from 'vue';
+import {useTalkgroupsStore} from '../stores/talkgroupsStore';
+import {useRouter, useRoute} from 'vue-router';
+import {onMounted} from 'vue';
 
 const talkgroupsStore = useTalkgroupsStore();
 const router = useRouter();

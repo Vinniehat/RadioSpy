@@ -53,12 +53,30 @@ app.get("/api/systems/:id/talkgroups", async (req, res) => {
 });
 
 app.get("/api/talkgroups/:id/recordings", async (req, res) => {
+    const talkgroupId = req.params.id;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
     const [recordings] = await db.execute(
-        "SELECT * FROM recordings WHERE talkgroup_id = ? ORDER BY timestamp DESC",
-        [req.params.id]
+        "SELECT * FROM recordings WHERE talkgroup_id = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+        [talkgroupId, limit, offset]
     );
-    res.json(recordings);
+
+    // Optionally get total count for UI
+    const [[{ total }]] = await db.execute(
+        "SELECT COUNT(*) as total FROM recordings WHERE talkgroup_id = ?",
+        [talkgroupId]
+    );
+
+    res.json({
+        recordings,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
+    });
 });
+
 
 app.get("/api/recordings/:id/audio", async (req, res) => {
     const [rows] = await db.execute(
