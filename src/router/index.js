@@ -4,9 +4,10 @@ import Talkgroups from "../views/Talkgroups.vue";
 import Recordings from "../views/Recordings.vue";
 
 const routes = [
-  { path: "/", name: "Systems", component: Systems },
-  { path: "/system/:id/talkgroups", name: "Talkgroups", component: Talkgroups },
-  { path: "/talkgroup/:id/recordings", name: "Recordings", component: Recordings },
+  { path: '/', redirect: '/systems' },
+  { path: '/systems', component: Systems },
+  { path: '/systems/:id/talkgroups', component: Talkgroups },
+  { path: '/talkgroups/:id/recordings', component: Recordings },
 ];
 
 const router = createRouter({

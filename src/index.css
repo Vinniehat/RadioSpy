@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+:root {
+    --bg: #121212;
+    --panel: #1e1e1e;
+    --text: #e0e0e0;
+    --primary: #1DB954;
+    --secondary: #f5a623;
+    --muted: #333;
+}
+
+body {
+    @apply bg-[var(--bg)] text-[var(--text)] font-sans min-h-screen;
+}
