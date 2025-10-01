@@ -2,6 +2,8 @@
 
 This template should help get you started developing with Vue 3 in Vite.
 
+1-way sync between [Gitea](https://gitea.vinniehat.com/violetsnow08/RadioSpy) and [GitHub](https://github.com/Vinniehat/RadioSpy)
+
 ## Recommended IDE Setup
 
 [VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
