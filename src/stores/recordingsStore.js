@@ -35,15 +35,29 @@ export const useRecordingsStore = defineStore("recordings", {
                 { params: { page, limit: this.limit } }
             );
 
-            // Update state, avoiding duplicates
-            const existingIDs = new Set(this.recordings.map(r => r.id));
-            const newRecs = res.data.recordings
-                .filter(r => !existingIDs.has(r.id))
-                .map(r => ({ ...r, systemID, talkgroupID }));
-            this.recordings.push(...newRecs);
+            // Update state, override existing recordings for this talkgroup
+            this.recordings = this.recordings.filter(r => !(r.systemID == systemID && r.talkgroupID == talkgroupID));
+            const fetchedRecordings = res.data.recordings.map(r => ({ ...r, systemID, talkgroupID }));
+            this.recordings.push(...fetchedRecordings);
             this.totalPages = res.data.totalPages;
             this.page = page;
             return this.getRecordingsByTalkgroup(systemID, talkgroupID);
+        },
+        async getOrFetchRecordingsByTalkgroup(systemID, talkgroupID) {
+            let recordings = this.getRecordingsByTalkgroup(systemID, talkgroupID);
+            if (recordings.length) return recordings;
+
+            // If not found in state, fetch from server
+            await this.fetchRecordingsByTalkgroup(systemID, talkgroupID);
+            return this.getRecordingsByTalkgroup(systemID, talkgroupID);
+        },
+        async getOrFetchRecording(systemID, talkgroupID, recordingID) {
+            let recording = this.getRecordingByID(recordingID);
+            if (recording) return recording;
+
+            // If not found in state, fetch recordings for the talkgroup and look again
+            await this.fetchRecordingsByTalkgroup(systemID, talkgroupID);
+            return this.getRecordingByID(recordingID);
         },
         async nextPage() {
             if (this.page < this.totalPages) {
@@ -58,6 +72,9 @@ export const useRecordingsStore = defineStore("recordings", {
         getAudioUrl(recordingID) {
             const systemsStore = useSystemsStore();
             const talkgroupsStore = useTalkgroupsStore();
+
+            // Check for null -> This prevents constructing invalid URLs
+            if (!systemsStore.currentSystemID || !talkgroupsStore.currentTalkgroupID || !recordingID) return null;
 
             return `${import.meta.env.VITE_API_URL}/systems/${systemsStore.currentSystemID}/talkgroups/${talkgroupsStore.currentTalkgroupID}/recordings/${recordingID}/audio`;
         },

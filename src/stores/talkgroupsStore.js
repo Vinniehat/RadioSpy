@@ -30,13 +30,19 @@ export const useTalkgroupsStore = defineStore("talkgroups", {
         async fetchTalkgroupsBySystem(systemID) {
 
             const res = await axios.get(`${import.meta.env.VITE_API_URL}/systems/${systemID}/talkgroups`);
-            // Update state, avoiding duplicates
-            const existingIDs = new Set(this.talkgroups.map(tg => `${tg.systemID}-${tg.id}`));
-            const newTGs = res.data
-                .filter(tg => !existingIDs.has(`${systemID}-${tg.id}`))
-                .map(tg => ({ ...tg, systemID }));
-            this.talkgroups.push(...newTGs);
+            // Remove existing talkgroups for this system
+            this.talkgroups = this.talkgroups.filter(tg => tg.systemID != systemID);
+            // Add fetched talkgroups
+            const fetchedTGs = res.data.map(tg => ({ ...tg, systemID }));
+            this.talkgroups.push(...fetchedTGs);
+
+
             return this.getTalkgroupsBySystem(systemID);
+        },
+        async getOrFetchTalkgroupsBySystem(systemID) {
+            let tgs = this.getTalkgroupsBySystem(systemID);
+            if (tgs.length) return tgs;
+            return await this.fetchTalkgroupsBySystem(systemID);
         },
 
         // Get a talkgroup from state or fetch from server if missing

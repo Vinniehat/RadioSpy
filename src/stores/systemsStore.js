@@ -19,13 +19,19 @@ export const useSystemsStore = defineStore('systems', {
             const res = await axios.get(`${import.meta.env.VITE_API_URL}/systems`);
             this.systems = res.data;
         },
+        async fetchSystemById(systemId) {
+            const res = await axios.get(`${import.meta.env.VITE_API_URL}/systems/${systemId}`);
+            // upsert instead of push blindly
+            const idx = this.systems.findIndex(s => s.id === res.data.id);
+            if (idx >= 0) this.systems[idx] = res.data;
+            else this.systems.push(res.data);
+            return res.data;
+        },
         async getOrFetchSystem(systemId) {
             let system = this.getSystemById(systemId);
             if (system) return system;
 
-            const res = await axios.get(`${import.meta.env.VITE_API_URL}/systems/${systemId}`);
-            this.systems.push(res.data);
-            return res.data;
+            return await this.fetchSystemById(systemId);
         },
     },
 });

@@ -35,8 +35,7 @@ const applyVolume = () => {
 onMounted(async () => {
   currentSystem.value = await systemsStore.getOrFetchSystem(route.params.systemID);
   currentTalkgroup.value = await talkgroupsStore.getOrFetchTalkgroup(route.params.systemID, route.params.talkgroupID);
-  await recordingsStore.fetchRecordingsByTalkgroup(route.params.systemID, route.params.talkgroupID);
-  recordings.value = await recordingsStore.getRecordingsByTalkgroup(route.params.systemID, route.params.talkgroupID);
+  recordings.value = await recordingsStore.getOrFetchRecordingsByTalkgroup(route.params.systemID, route.params.talkgroupID);
   applyVolume();
 });
 </script>

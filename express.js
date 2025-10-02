@@ -7,6 +7,7 @@ import path from "path";
 import dotenv from "dotenv";
 dotenv.config();
 import cors from "cors";
+import morgan from "morgan";
 
 const app = express();
 const httpServer = createServer(app);
@@ -37,7 +38,7 @@ const db = await mysql.createPool({
 
 app.use(express.json());
 app.use(cors());
-
+app.use(morgan("dev"));
 // --- API Endpoints ---
 app.get("/api/systems", async (req, res) => {
     const [systems] = await db.execute("SELECT * FROM systems");
@@ -86,7 +87,7 @@ app.get("/api/systems/:systemID/talkgroups/:talkgroupID/recordings", async (req,
 
         // Get recordings
         const [recordings] = await db.execute(
-            "SELECT * FROM recordings WHERE talkgroup_id = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+            "SELECT * FROM recordings WHERE talkgroup_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
             [talkgroupID, limit, offset]
         );
 
@@ -127,6 +128,8 @@ app.get("/api/systems/:systemID/talkgroups/:talkgroupID/recordings/:recordingID/
     });
 });
 
+// --- Start server ---
+httpServer.listen(3000, () => console.log("Server running on http://localhost:3000"));
 
 
 // --- Watch folder for new recordings ---
@@ -144,7 +147,7 @@ watcher.on("add", async (filepath) => {
         const talkgroupId = parseInt(tgSegment, 10);
         const folderPath = path.join(...segments.slice(0, segments.length - 1));
 
-        console.log({ dateFolder, favorite, systemName, talkgroupId, folderPath, filename });
+        // console.log({ dateFolder, favorite, systemName, talkgroupId, folderPath, filename });
 
         // --- Insert system safely ---
         await db.execute("INSERT IGNORE INTO systems (name) VALUES (?)", [systemName]);
@@ -176,5 +179,3 @@ watcher.on("add", async (filepath) => {
 });
 
 
-// --- Start server ---
-httpServer.listen(3000, () => console.log("Server running on http://localhost:3000"));
