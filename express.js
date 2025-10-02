@@ -153,8 +153,8 @@ watcher.on("add", async (filepath) => {
 
         // --- Insert recording ---
         await db.execute(
-            "INSERT INTO recordings (talkgroup_id, folder_path, filename) VALUES (?, ?, ?)",
-            [safeTalkgroupId, folderPath, filename]
+            "INSERT INTO recordings (talkgroup_id, folder_path, filename, system_id) VALUES (?, ?, ?, ?)",
+            [safeTalkgroupId, folderPath, filename, systemId]
         );
 
         // --- Notify frontend ---
