@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { onMounted, ref, nextTick } from "vue";
 import { useSystemsStore } from "../stores/systemsStore";
 import { useTalkgroupsStore } from "../stores/talkgroupsStore";
 import { useRecordingsStore } from "../stores/recordingsStore";
@@ -10,18 +10,34 @@ const talkgroupsStore = useTalkgroupsStore();
 const recordingsStore = useRecordingsStore();
 const route = useRoute();
 
-// talkgroupsStore.setCurrentTalkgroupID(route.params.talkgroupID);
-
 const currentSystem = ref(null);
 const currentTalkgroup = ref(null);
+
+// --- Volume management ---
+const volume = ref(parseFloat(localStorage.getItem('defaultVolume')) || 0.5);
+
+const applyVolume = () => {
+  nextTick(() => {
+    const audioElements = document.querySelectorAll('audio');
+    audioElements.forEach(audio => {
+      audio.volume = volume.value;
+      audio.onvolumechange = () => {
+        localStorage.setItem('defaultVolume', audio.volume);
+        volume.value = audio.volume;
+      };
+    });
+  });
+};
 
 // Fetch system and recordings
 onMounted(async () => {
   currentSystem.value = await systemsStore.getOrFetchSystem(route.params.systemID);
   currentTalkgroup.value = await talkgroupsStore.getOrFetchTalkgroup(route.params.systemID, route.params.talkgroupID);
   await recordingsStore.fetchRecordings(route.params.systemID, route.params.talkgroupID);
+  applyVolume();
 });
 </script>
+
 
 <template>
   <div class="p-6">
