@@ -58,6 +58,17 @@ app.get("/api/systems/:id/talkgroups", async (req, res) => {
     res.json(talkgroups);
 });
 
+app.get("/api/systems/:systemID/talkgroups/:talkgroupID", async (req, res) => {
+    const { systemID, talkgroupID } = req.params;
+    const [talkgroups] = await db.execute(
+        "SELECT * FROM talkgroups WHERE system_id = ? AND id = ?",
+        [systemID, talkgroupID]
+    );
+    if (!talkgroups.length) return res.sendStatus(404);
+    res.json(talkgroups[0]);
+});
+
+
 // --- Serve recordings for a talkgroup ---
 app.get("/api/systems/:systemID/talkgroups/:talkgroupID/recordings", async (req, res) => {
     const { systemID, talkgroupID } = req.params;
