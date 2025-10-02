@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { api } from "../api";
+import axios from "axios";
 
 export const useSystemsStore = defineStore("systems", {
     state: () => ({
@@ -7,12 +7,17 @@ export const useSystemsStore = defineStore("systems", {
     }),
     actions: {
         async fetchSystems() {
-            try {
-                const res = await api.get("/systems");
-                this.systems = res.data;
-            } catch (err) {
-                console.error("Failed to fetch systems:", err);
-            }
+            if (this.systems.length > 0) return;
+            const res = await axios.get(`${import.meta.env.VITE_API_URL}/systems`);
+            this.systems = res.data;
+        },
+        async getSystem(systemId) {
+            let system = this.systems.find(s => s.id == systemId);
+            if (system) return system;
+
+            const res = await axios.get(`${import.meta.env.VITE_API_URL}/systems/${systemId}`);
+            this.systems.push(res.data);
+            return res.data;
         },
     },
 });

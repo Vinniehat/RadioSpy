@@ -1,32 +1,39 @@
 <script setup>
 import { useRecordingsStore } from '../stores/recordingsStore';
 import { useRoute } from 'vue-router';
-import {inject, onMounted} from 'vue';
-
-
-
-// Base URL for audio files
-const apiUrl = inject("apiUrl");
+import { onMounted } from 'vue';
 
 const recordingsStore = useRecordingsStore();
 const route = useRoute();
+
+// Grab systemID and talkgroupID from route params
+const systemID = route.params.systemID;
+const talkgroupID = route.params.talkgroupID;
+
 // Fetch recordings on mount
-onMounted(() => recordingsStore.fetchRecordings(route.params.id));
+onMounted(() => {
+  recordingsStore.fetchRecordings(systemID, talkgroupID);
+});
+
+// Pagination handlers
+const nextPage = () => recordingsStore.nextPage();
+const prevPage = () => recordingsStore.prevPage();
 </script>
 
 <template>
   <div class="p-6">
-    <h1 class="text-3xl font-bold mb-6 text-[var(--primary)]">Recordings</h1>
+    <h1 class="text-3xl font-bold mb-6 text-[var(--primary)]">
+      Recordings for TG {{ talkgroupID }}
+    </h1>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
       <div
           v-for="rec in recordingsStore.recordings"
           :key="rec.id"
-          class="bg-[var(--panel)] border border-[var(--accent)] p-4 rounded-lg shadow
-               hover:shadow-lg hover:scale-105 transition cursor-pointer"
+          class="bg-[var(--panel)] border border-[var(--accent)] p-4 rounded-lg shadow hover:shadow-lg hover:scale-105 transition cursor-pointer"
       >
         <p class="text-[var(--text)] font-semibold text-lg">{{ rec.filename }}</p>
-        <audio :src="`${apiUrl}/recordings/${rec.id}/audio`" controls class="w-full mt-2"></audio>
+        <audio :src="recordingsStore.getAudioUrl(rec.id)" controls class="w-full mt-2"></audio>
       </div>
     </div>
 
@@ -34,7 +41,7 @@ onMounted(() => recordingsStore.fetchRecordings(route.params.id));
     <div class="flex justify-center mt-6 space-x-4">
       <button
           class="px-4 py-2 bg-[var(--panel)] rounded hover:bg-gray-700"
-          @click="recordingsStore.prevPage"
+          @click="prevPage"
           :disabled="recordingsStore.page === 1"
       >
         Previous
@@ -46,7 +53,7 @@ onMounted(() => recordingsStore.fetchRecordings(route.params.id));
 
       <button
           class="px-4 py-2 bg-[var(--panel)] rounded hover:bg-gray-700"
-          @click="recordingsStore.nextPage"
+          @click="nextPage"
           :disabled="recordingsStore.page === recordingsStore.totalPages"
       >
         Next

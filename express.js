@@ -44,6 +44,12 @@ app.get("/api/systems", async (req, res) => {
     res.json(systems);
 });
 
+app.get("/api/systems/:id", async (req, res) => {
+    const [systems] = await db.execute("SELECT * FROM systems WHERE id = ?", [req.params.id]);
+    if (!systems.length) return res.sendStatus(404);
+    res.json(systems[0]);
+});
+
 app.get("/api/systems/:id/talkgroups", async (req, res) => {
     const [talkgroups] = await db.execute(
         "SELECT * FROM talkgroups WHERE system_id = ?",
@@ -52,36 +58,45 @@ app.get("/api/systems/:id/talkgroups", async (req, res) => {
     res.json(talkgroups);
 });
 
-app.get("/api/talkgroups/:id/recordings", async (req, res) => {
-    const talkgroupId = req.params.id;
+// --- Serve recordings for a talkgroup ---
+app.get("/api/systems/:systemID/talkgroups/:talkgroupID/recordings", async (req, res) => {
+    const { systemID, talkgroupID } = req.params;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
-    const [recordings] = await db.execute(
-        "SELECT * FROM recordings WHERE talkgroup_id = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?",
-        [talkgroupId, limit, offset]
-    );
+    try {
+        // Get total count for pagination
+        const [countResult] = await db.execute(
+            "SELECT COUNT(*) as total FROM recordings WHERE talkgroup_id = ?",
+            [talkgroupID]
+        );
+        const totalPages = Math.ceil(countResult[0].total / limit);
 
-    // Optionally get total count for UI
-    const [[{ total }]] = await db.execute(
-        "SELECT COUNT(*) as total FROM recordings WHERE talkgroup_id = ?",
-        [talkgroupId]
-    );
+        // Get recordings
+        const [recordings] = await db.execute(
+            "SELECT * FROM recordings WHERE talkgroup_id = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+            [talkgroupID, limit, offset]
+        );
 
-    res.json({
-        recordings,
-        total,
-        page,
-        totalPages: Math.ceil(total / limit),
-    });
+        res.json({
+            recordings,
+            page,
+            totalPages
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Server error" });
+    }
 });
 
 
-app.get("/api/recordings/:id/audio", async (req, res) => {
+app.get("/api/systems/:systemID/talkgroups/:talkgroupID/recordings/:recordingID/audio", async (req, res) => {
+    const { recordingID } = req.params;
+
     const [rows] = await db.execute(
         "SELECT folder_path, filename FROM recordings WHERE id = ?",
-        [req.params.id]
+        [recordingID]
     );
 
     if (!rows.length) return res.sendStatus(404);
@@ -100,6 +115,7 @@ app.get("/api/recordings/:id/audio", async (req, res) => {
         }
     });
 });
+
 
 
 // --- Watch folder for new recordings ---

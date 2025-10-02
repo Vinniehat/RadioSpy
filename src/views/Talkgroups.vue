@@ -11,9 +11,6 @@
           @click="selectTalkgroup(tg.id)"
       >
         <p class="text-[var(--text)] font-semibold text-lg">{{ tg.name }}</p>
-        <p class="text-[var(--muted)] text-sm mt-1">
-          {{ tg.recordingCount ?? '—' }} recordings
-        </p>
       </div>
     </div>
   </div>
@@ -29,8 +26,8 @@ const router = useRouter();
 const route = useRoute();
 
 const selectTalkgroup = (id) => {
-  router.push(`/talkgroups/${id}/recordings`);
+  router.push(`/systems/${route.params.systemID}/talkgroups/${id}/recordings`);
 };
 
-onMounted(() => talkgroupsStore.fetchTalkgroups(route.params.id));
+onMounted(() => talkgroupsStore.fetchTalkgroups(route.params.systemID));
 </script>
