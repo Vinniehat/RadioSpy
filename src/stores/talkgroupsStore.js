@@ -8,7 +8,10 @@ export const useTalkgroupsStore = defineStore("talkgroups", {
     }),
     getters: {
         // Get all talkgroups for a specific system (from state)
-        getTalkgroups: (state) => (systemID) => {
+        getAllTalkgroups: (state) => {
+            return state.talkgroups;
+        },
+        getTalkgroupsBySystem: (state) => (systemID) => {
             return state.talkgroups.filter(tg => tg.systemID == systemID);
         },
         // Get a specific talkgroup by system and ID (from state)
@@ -18,14 +21,22 @@ export const useTalkgroupsStore = defineStore("talkgroups", {
     },
     actions: {
         // Fetch all talkgroups for a system (only if not already in state)
-        async fetchTalkgroups(systemID) {
-            const localTGs = this.getTalkgroups(systemID);
-            if (localTGs.length > 0) return localTGs;
+        async fetchTalkgroups() {
+            const res = await axios.get(`${import.meta.env.VITE_API_URL}/talkgroups`);
+            this.talkgroups = res.data;
+            return this.talkgroups;
+        },
+
+        async fetchTalkgroupsBySystem(systemID) {
 
             const res = await axios.get(`${import.meta.env.VITE_API_URL}/systems/${systemID}/talkgroups`);
-            const tgs = res.data.map(tg => ({ ...tg, systemID }));
-            this.talkgroups.push(...tgs);
-            return tgs;
+            // Update state, avoiding duplicates
+            const existingIDs = new Set(this.talkgroups.map(tg => `${tg.systemID}-${tg.id}`));
+            const newTGs = res.data
+                .filter(tg => !existingIDs.has(`${systemID}-${tg.id}`))
+                .map(tg => ({ ...tg, systemID }));
+            this.talkgroups.push(...newTGs);
+            return this.getTalkgroupsBySystem(systemID);
         },
 
         // Get a talkgroup from state or fetch from server if missing

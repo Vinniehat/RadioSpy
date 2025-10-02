@@ -10,8 +10,24 @@ export const useRecordingsStore = defineStore("recordings", {
         totalPages: 1,
         limit: 10,
     }),
+    getters: {
+        getAllRecordings: (state) => {
+            return state.recordings;
+        },
+        getRecordingByID: (state) => (recordingID) => {
+            return state.recordings.find(r => r.id == recordingID);
+        },
+        getRecordingsByTalkgroup: (state) => (systemID, talkgroupID) => {
+            return state.recordings.filter(r => r.systemID == systemID && r.talkgroupID == talkgroupID);
+        }
+    },
     actions: {
-        async fetchRecordings(systemID = systemsStore.currentSystemID, talkgroupID = talkgroupsStore.currentTalkgroupID, page = 1) {
+        async fetchRecordings() {
+            // INOP
+            // Will cause too many requests if not limited by system/talkgroup
+            return [];
+        },
+        async fetchRecordingsByTalkgroup(systemID = systemsStore.currentSystemID, talkgroupID = talkgroupsStore.currentTalkgroupID, page = 1) {
             if (!systemID || !talkgroupID) return;
 
             const res = await axios.get(
@@ -19,9 +35,15 @@ export const useRecordingsStore = defineStore("recordings", {
                 { params: { page, limit: this.limit } }
             );
 
-            this.recordings = res.data.recordings;
+            // Update state, avoiding duplicates
+            const existingIDs = new Set(this.recordings.map(r => r.id));
+            const newRecs = res.data.recordings
+                .filter(r => !existingIDs.has(r.id))
+                .map(r => ({ ...r, systemID, talkgroupID }));
+            this.recordings.push(...newRecs);
             this.totalPages = res.data.totalPages;
             this.page = page;
+            return this.getRecordingsByTalkgroup(systemID, talkgroupID);
         },
         async nextPage() {
             if (this.page < this.totalPages) {

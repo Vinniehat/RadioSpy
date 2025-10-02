@@ -16,7 +16,6 @@ export const useSystemsStore = defineStore('systems', {
     },
     actions: {
         async fetchSystems() {
-            if (this.systems.length > 0) return;
             const res = await axios.get(`${import.meta.env.VITE_API_URL}/systems`);
             this.systems = res.data;
         },

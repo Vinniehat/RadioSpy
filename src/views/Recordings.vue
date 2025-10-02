@@ -12,6 +12,7 @@ const route = useRoute();
 
 const currentSystem = ref(null);
 const currentTalkgroup = ref(null);
+const recordings = ref([]);
 
 // --- Volume management ---
 const volume = ref(parseFloat(localStorage.getItem('defaultVolume')) || 0.5);
@@ -29,11 +30,13 @@ const applyVolume = () => {
   });
 };
 
+
 // Fetch system and recordings
 onMounted(async () => {
   currentSystem.value = await systemsStore.getOrFetchSystem(route.params.systemID);
   currentTalkgroup.value = await talkgroupsStore.getOrFetchTalkgroup(route.params.systemID, route.params.talkgroupID);
-  await recordingsStore.fetchRecordings(route.params.systemID, route.params.talkgroupID);
+  await recordingsStore.fetchRecordingsByTalkgroup(route.params.systemID, route.params.talkgroupID);
+  recordings.value = await recordingsStore.getRecordingsByTalkgroup(route.params.systemID, route.params.talkgroupID);
   applyVolume();
 });
 </script>
@@ -42,12 +45,12 @@ onMounted(async () => {
 <template>
   <div class="p-6">
     <h1 class="text-3xl font-bold mb-6 text-[var(--primary)]">
-      Recordings for {{ currentSystem?.name }} / {{ currentTalkgroup?.name }}
+      Recordings for {{ currentSystem?.name }} > {{ currentTalkgroup?.name }}
     </h1>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
       <div
-          v-for="rec in recordingsStore.recordings"
+          v-for="rec in recordings"
           :key="rec.id"
           class="bg-[var(--panel)] border border-[var(--accent)] p-4 rounded-lg shadow
                hover:shadow-lg hover:scale-105 transition cursor-pointer"

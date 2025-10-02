@@ -29,5 +29,5 @@ const selectTalkgroup = (id) => {
   router.push(`/systems/${route.params.systemID}/talkgroups/${id}/recordings`);
 };
 
-onMounted(() => talkgroupsStore.fetchTalkgroups(route.params.systemID));
+onMounted(() => talkgroupsStore.fetchTalkgroupsBySystem(route.params.systemID));
 </script>
