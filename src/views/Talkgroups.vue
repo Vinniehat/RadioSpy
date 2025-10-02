@@ -11,6 +11,10 @@
           @click="selectTalkgroup(tg.id)"
       >
         <p class="text-[var(--text)] font-semibold text-lg">{{ tg.name }}</p>
+        <div class="flex justify-between text-[var(--muted)] text-sm mt-1">
+          <span>Last Heard: 6 hours ago</span>
+          <span>ID: {{ tg.id }}</span>
+        </div>
       </div>
     </div>
   </div>
