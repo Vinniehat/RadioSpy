@@ -11,7 +11,6 @@ import morgan from "morgan";
 const RECORDINGS_DIR = "C:\\ProScan\\Recordings";
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer);
 
 dotenv.config();
 
@@ -36,6 +35,15 @@ app.use(express.json());
 app.use(cors());
 app.use(morgan("dev"));
 
+
+// when creating the io server
+const io = new Server(httpServer, {
+    cors: {
+        origin: "http://localhost:5173", // <-- your frontend URL
+        methods: ["GET", "POST"],
+        credentials: true
+    }
+});
 
 // --- API Endpoints ---
 
