@@ -4,6 +4,7 @@ import {useSystemsStore} from "../stores/systemsStore";
 import {useTalkgroupsStore} from "../stores/talkgroupsStore";
 import {useRecordingsStore} from "../stores/recordingsStore";
 import {useRoute} from "vue-router";
+import {io} from "socket.io-client";
 
 const systemsStore = useSystemsStore();
 const talkgroupsStore = useTalkgroupsStore();
@@ -29,7 +30,7 @@ const applyVolume = () => {
   });
 };
 
-// recordings tied to current system/talkgroup
+// --- Recordings ---
 const recordings = computed(() =>
     recordingsStore.getRecordingsByTalkgroup(route.params.talkgroupID)
 );
@@ -38,6 +39,34 @@ const recordings = computed(() =>
 watch(recordings, () => {
   applyVolume();
 });
+
+
+// Socket.io setup
+const socket = io(import.meta.env.VITE_SOCKET_URL);
+
+socket.on("connect", () => {
+  console.log("Connected to Node server for live transcription");
+});
+
+// --- Transcriptions (no separate ref needed) ---
+socket.on("new-transcription", (data) => {
+  // Find the recording in the store and update its transcription
+  const rec = recordingsStore.recordings.find(r => r.id === data.recording_id);
+  if (rec) rec.transcription = data.transcription;
+});
+
+// --- Request transcription manually ---
+const requestTranscription = (rec) => {
+  if (!rec.transcription) {
+    rec.transcription = "Transcription in progress...";
+    socket.emit("request-transcription", {
+      recording_id: rec.id,
+      folderPath: rec.folder_path,
+      filename: rec.filename
+    });
+  }
+};
+
 
 onMounted(async () => {
   currentSystem.value = await systemsStore.getOrFetchSystem(route.params.systemID);
@@ -48,37 +77,7 @@ onMounted(async () => {
   applyVolume();
 });
 
-// Example fake transcriptions
-const fakeTranscriptions = [
-  // Dispatcher-style
-  "Dispatch to Unit 14: We have multiple calls reporting a possible altercation outside the Greenview Mall, witnesses say three individuals involved, one possibly armed with a bat. Respond with caution.",
-  "Attention all units: Severe weather moving into the north sector. Expect heavy rain, reduced visibility, and possible flooding along Route 18. Use caution when responding to calls.",
-  "Unit 22, report of a vehicle collision at the intersection of Oak and 5th. Caller states airbags deployed, two vehicles blocking traffic, unknown injuries at this time. EMS notified and en route.",
-  "Car 9, respond to a noise complaint at Riverside Apartments, building 4. Caller reports ongoing loud music and possible underage drinking. Backup may be required due to large crowd size.",
-  "Control to Medic 3: We’ve got a medical emergency at Fairview Park, individual collapsed during a sporting event. Bystanders are performing CPR. Estimated time of arrival requested.",
-  "Air Unit 5 to dispatch: Visual confirmation of a suspect on foot near the railway yard, moving southbound between freight cars. Requesting ground units to set up perimeter at Maple and 12th.",
-  "Dispatch: Be advised, traffic lights are out along Main Street corridor due to power outage. Multiple calls of near-misses at intersections. Units please monitor for accidents until utilities arrive.",
-  "Attention all units: BOLO for a silver SUV with front-end damage, last seen heading eastbound on I-90. Vehicle may be involved in earlier hit-and-run near Downtown district.",
-  "Engine 4, reports of smoke visible at the 1200 block of Pine Avenue. Caller indicates strong smell of gas in the area. Gas company has been contacted, proceed with extreme caution.",
-
-  // Officer-style
-  "Unit 14: Copy that, en route to Greenview Mall. ETA 4 minutes.",
-  "Unit 22: Arrived at Oak and 5th, two vehicles involved, requesting tow and EMS priority.",
-  "Car 9: Copy noise complaint at Riverside Apartments, will advise if additional units needed.",
-  "Unit 7: Situation at Elmwood store under control, suspect in custody, no further backup required.",
-  "Medic 3: Acknowledged, en route to Fairview Park, approximately 6 minutes out.",
-  "Air Unit 5: Suspect still in sight, moving toward the industrial park. Ground units advised.",
-  "Unit 4: Copy power outage along Main Street, directing traffic at 3rd and Main until utilities arrive.",
-  "Unit 12: BOLO received, monitoring eastbound I-90 traffic for silver SUV.",
-  "Engine 4: Arrived on Pine Avenue, smoke confirmed, staging until gas company on scene.",
-
-    "RECORDING NOT TRANSCRIBED..."
-];
-
-
 </script>
-
-
 
 <template>
   <div class="p-6">
@@ -101,11 +100,20 @@ const fakeTranscriptions = [
             preload="metadata"
             class="w-full mt-2"
         ></audio>
-        <p class="text-[var(--text)] italic">
-          {{
-            fakeTranscriptions[Math.floor(Math.random() * fakeTranscriptions.length)]
-          }}
-        </p>
+
+        <div class="mt-2 flex flex-col h-40 justify-between p-2 bg-[var(--panel)] rounded">
+          <div class="text-[var(--text)] whitespace-pre-wrap break-words overflow-auto">
+            {{ rec.transcription || "No transcription yet..." }}
+          </div>
+          <button
+              class="px-2 py-1 bg-[var(--accent)] text-black rounded hover:bg-gray-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="rec.transcription"
+              @click="requestTranscription(rec)"
+          >
+            Transcribe
+          </button>
+        </div>
+
       </div>
     </div>
 
@@ -133,4 +141,3 @@ const fakeTranscriptions = [
     </div>
   </div>
 </template>
-

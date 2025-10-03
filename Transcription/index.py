@@ -1,6 +1,7 @@
 import socketio
 from faster_whisper import WhisperModel
 from colorama import Fore, Style
+import time
 
 # Connect to Node server
 sio = socketio.Client()
@@ -28,6 +29,11 @@ def connect():
 @sio.on("request-transcription")
 def handle_transcription(data):
     print(Fore.GREEN + f"Received transcription request for {data['filename']}" + Style.RESET_ALL)
+    time.sleep(10)
+    sio.emit("transcription-complete", {
+            "recording_id": data["recording_id"],
+            "transcription": "testing 123"
+        })
     file_path = f"{data['folderPath']}\\{data['filename']}"
     transcription_text = transcribe_file(file_path)
     if transcription_text:
@@ -36,6 +42,8 @@ def handle_transcription(data):
             "transcription": transcription_text
         })
         print(Fore.BLUE + f"Transcription sent for {data['filename']}" + Style.RESET_ALL)
+        return
+    print(Fore.RED + f"Failed to transcribe {data['filename']}" + Style.RESET_ALL)
 
 # Connect to Node server
 sio.connect("http://localhost:3000")
