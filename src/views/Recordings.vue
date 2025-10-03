@@ -32,7 +32,6 @@ const applyVolume = () => {
 // recordings tied to current system/talkgroup
 const recordings = computed(() =>
     recordingsStore.getRecordingsByTalkgroup(
-        route.params.systemID,
         route.params.talkgroupID
     )
 );
@@ -40,7 +39,6 @@ const recordings = computed(() =>
 onMounted(async () => {
   currentSystem.value = await systemsStore.getOrFetchSystem(route.params.systemID);
   currentTalkgroup.value = await talkgroupsStore.getOrFetchTalkgroup(
-      route.params.systemID,
       route.params.talkgroupID
   );
   await recordingsStore.fetchRecordingsByTalkgroup(
@@ -79,7 +77,7 @@ onMounted(async () => {
     <div class="flex justify-center mt-6 space-x-4">
       <button
           class="px-4 py-2 bg-[var(--panel)] rounded hover:bg-gray-700"
-          @click="recordingsStore.prevPage(route.params.systemID, route.params.talkgroupID)"
+          @click="recordingsStore.prevPage(route.params.talkgroupID)"
           :disabled="recordingsStore.page === 1"
       >
         Previous
@@ -91,7 +89,7 @@ onMounted(async () => {
 
       <button
           class="px-4 py-2 bg-[var(--panel)] rounded hover:bg-gray-700"
-          @click="recordingsStore.nextPage(route.params.systemID, route.params.talkgroupID)"
+          @click="recordingsStore.nextPage(route.params.talkgroupID)"
           :disabled="recordingsStore.page === recordingsStore.totalPages"
       >
         Next

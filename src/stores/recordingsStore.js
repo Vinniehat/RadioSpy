@@ -17,8 +17,8 @@ export const useRecordingsStore = defineStore("recordings", {
         getRecordingByID: (state) => (recordingID) => {
             return state.recordings.find(r => r.id == recordingID);
         },
-        getRecordingsByTalkgroup: (state) => (systemID, talkgroupID) => {
-            return state.recordings.filter(r => r.systemID == systemID && r.talkgroupID == talkgroupID);
+        getRecordingsByTalkgroup: (state) => (talkgroupID) => {
+            return state.recordings.filter(r => r.talkgroupID == talkgroupID);
         }
     },
     actions: {
@@ -36,29 +36,29 @@ export const useRecordingsStore = defineStore("recordings", {
             );
 
             // Only replace after new recordings are fetched
-            const fetchedRecordings = res.data.recordings.map(r => ({ ...r, systemID, talkgroupID }));
+            const fetchedRecordings = res.data.recordings.map(r => ({ ...r, talkgroupID }));
 
             // Replace the array in one step
             this.recordings = [
-                ...this.recordings.filter(r => !(r.systemID === systemID && r.talkgroupID === talkgroupID)),
+                ...this.recordings.filter(r => !(r.talkgroupID === talkgroupID)),
                 ...fetchedRecordings
             ];
 
             this.totalPages = res.data.totalPages;
             this.page = page;
 
-            return this.getRecordingsByTalkgroup(systemID, talkgroupID);
+            return this.getRecordingsByTalkgroup(talkgroupID);
         },
 
-        async getOrFetchRecordingsByTalkgroup(systemID, talkgroupID) {
+        async getOrFetchRecordingsByTalkgroup(talkgroupID) {
             let recordings = this.getRecordingsByTalkgroup(systemID, talkgroupID);
             if (recordings.length) return recordings;
 
             // If not found in state, fetch from server
             await this.fetchRecordingsByTalkgroup(talkgroupID);
-            return this.getRecordingsByTalkgroup(systemID, talkgroupID);
+            return this.getRecordingsByTalkgroup(talkgroupID);
         },
-        async getOrFetchRecording(systemID, talkgroupID, recordingID) {
+        async getOrFetchRecording(recordingID) {
             let recording = this.getRecordingByID(recordingID);
             if (recording) return recording;
 
@@ -66,13 +66,13 @@ export const useRecordingsStore = defineStore("recordings", {
             await this.fetchRecordingsByTalkgroup(talkgroupID);
             return this.getRecordingByID(recordingID);
         },
-        async nextPage(systemID, talkgroupID) {
+        async nextPage(talkgroupID) {
             if (this.page < this.totalPages) {
                 await this.fetchRecordingsByTalkgroup(talkgroupID, this.page + 1);
             }
         },
 
-        async prevPage(systemID, talkgroupID) {
+        async prevPage(talkgroupID) {
             if (this.page > 1) {
                 await this.fetchRecordingsByTalkgroup(talkgroupID, this.page - 1);
             }

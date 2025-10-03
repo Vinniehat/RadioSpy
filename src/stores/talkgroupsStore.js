@@ -14,8 +14,8 @@ export const useTalkgroupsStore = defineStore("talkgroups", {
         getTalkgroupsBySystem: (state) => (systemID) => {
             return state.talkgroups.filter(tg => tg.systemID == systemID);
         },
-        // Get a specific talkgroup by system and ID (from state)
-        getTalkgroup: (state) => (systemID, talkgroupID) => {
+        // Get a specific talkgroup ID (from state)
+        getTalkgroup: (state) => (talkgroupID) => {
             return state.talkgroups.find(tg => tg.systemID == systemID && tg.id == talkgroupID);
         },
     },
@@ -39,7 +39,7 @@ export const useTalkgroupsStore = defineStore("talkgroups", {
 
             const res = await axios.get(`${import.meta.env.VITE_API_URL}/systems/${systemID}/talkgroups`);
             // Remove existing talkgroups for this system
-            this.talkgroups = this.talkgroups.filter(tg => tg.systemID != systemID);
+            this.talkgroups = this.talkgroups.filter(tg => tg.system_id != systemID);
             // Add fetched talkgroups
             const fetchedTGs = res.data.map(tg => ({ ...tg, systemID }));
             this.talkgroups.push(...fetchedTGs);
