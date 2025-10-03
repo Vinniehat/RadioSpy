@@ -153,6 +153,32 @@ app.get("/api/recordings/:recordingID/audio", async (req, res) => {
     });
 });
 
+
+io.on("connection", (socket) => {
+    console.log("Socket connected:", socket.id);
+
+    socket.on("transcription-complete", async (data) => {
+        const { recording_id, transcription } = data;
+        try {
+            await db.execute(
+                "UPDATE recordings SET transcription = ? WHERE id = ?",
+                [transcription, recording_id]
+            );
+            console.log(`Transcription saved for recording ${recording_id}`);
+
+            // Optionally notify frontend
+            io.emit("new-transcription", {
+                recording_id,
+                transcription
+            });
+        } catch (err) {
+            console.error("Failed to save transcription:", err);
+        }
+    });
+});
+
+
+
 // --- Start server ---
 httpServer.listen(3000, () => console.log("Server running on http://localhost:3000"));
 
@@ -201,18 +227,19 @@ watcher.on("add", async (filepath) => {
             [folderPath, filename, talkgroup_id, system_id]
         );
 
-        var recording_id;
+        // Check for existing recording
         if (existing.length) {
-            recording_id = existing[0].id; // Already exists
-        } else {
-            const [insertResult] = await db.execute(
-                `INSERT INTO recordings (talkgroup_id, system_id, folder_path, filename)
-                 VALUES (?, ?, ?, ?)`,
-                [talkgroup_id, system_id, folderPath, filename]
-            );
-            recording_id = insertResult.insertId;
-            console.log(`New recording added: ${filepath} (ID: ${recording_id})`);
+            console.log(`Recording already exists in DB: ${filepath}`);
+            return;
         }
+
+        const [insertResult] = await db.execute(
+            `INSERT INTO recordings (talkgroup_id, system_id, folder_path, filename)
+                 VALUES (?, ?, ?, ?)`,
+            [talkgroup_id, system_id, folderPath, filename]
+        );
+        let recording_id = insertResult.insertId;
+        console.log(`New recording added: ${filepath} (ID: ${recording_id})`);
 
         // --- Notify frontend ---
         io.emit("new-recording", {
@@ -222,6 +249,21 @@ watcher.on("add", async (filepath) => {
             folderPath,
             filename
         });
+
+        // Technically this is an extra query we don't need all the time since we can tell if a TG has been created this run which defaults to false
+        const [result] = await db.execute(`SELECT auto_transcribe FROM talkgroups WHERE id = ?`, [talkgroup_id]);
+
+        // Check if this talkgroup is set for auto transcription
+        if (result.length && result[0].auto_transcribe) {
+            io.emit("request-transcription", { // By sending all id's, you don't have to make an additional query
+                system_id,
+                talkgroup_id,
+                recording_id,
+                folderPath,
+                filename
+            });
+        }
+
 
     } catch (err) {
         console.error("Watcher error:", err);
