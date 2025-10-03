@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref, nextTick } from "vue";
+import { onMounted, ref, nextTick, computed } from "vue";
 import { useSystemsStore } from "../stores/systemsStore";
 import { useTalkgroupsStore } from "../stores/talkgroupsStore";
 import { useRecordingsStore } from "../stores/recordingsStore";
@@ -12,30 +12,41 @@ const route = useRoute();
 
 const currentSystem = ref(null);
 const currentTalkgroup = ref(null);
-const recordings = ref([]);
 
-// --- Volume management ---
-const volume = ref(parseFloat(localStorage.getItem('defaultVolume')) || 0.5);
+// --- Volume ---
+const volume = ref(parseFloat(localStorage.getItem("defaultVolume")) || 0.5);
 
 const applyVolume = () => {
   nextTick(() => {
-    const audioElements = document.querySelectorAll('audio');
-    audioElements.forEach(audio => {
+    const audioElements = document.querySelectorAll("audio");
+    audioElements.forEach((audio) => {
       audio.volume = volume.value;
       audio.onvolumechange = () => {
-        localStorage.setItem('defaultVolume', audio.volume);
+        localStorage.setItem("defaultVolume", audio.volume);
         volume.value = audio.volume;
       };
     });
   });
 };
 
+// recordings tied to current system/talkgroup
+const recordings = computed(() =>
+    recordingsStore.getRecordingsByTalkgroup(
+        route.params.systemID,
+        route.params.talkgroupID
+    )
+);
 
-// Fetch system and recordings
 onMounted(async () => {
   currentSystem.value = await systemsStore.getOrFetchSystem(route.params.systemID);
-  currentTalkgroup.value = await talkgroupsStore.getOrFetchTalkgroup(route.params.systemID, route.params.talkgroupID);
-  recordings.value = await recordingsStore.getOrFetchRecordingsByTalkgroup(route.params.systemID, route.params.talkgroupID);
+  currentTalkgroup.value = await talkgroupsStore.getOrFetchTalkgroup(
+      route.params.systemID,
+      route.params.talkgroupID
+  );
+  await recordingsStore.fetchRecordingsByTalkgroup(
+      route.params.systemID,
+      route.params.talkgroupID
+  );
   applyVolume();
 });
 </script>
@@ -56,8 +67,10 @@ onMounted(async () => {
       >
         <p class="text-[var(--text)] font-semibold text-lg">{{ rec.filename }}</p>
         <audio
+            v-if="recordingsStore.getAudioUrl(rec.id)"
             :src="recordingsStore.getAudioUrl(rec.id)"
             controls
+            preload="metadata"
             class="w-full mt-2"
         ></audio>
       </div>
@@ -67,7 +80,7 @@ onMounted(async () => {
     <div class="flex justify-center mt-6 space-x-4">
       <button
           class="px-4 py-2 bg-[var(--panel)] rounded hover:bg-gray-700"
-          @click="recordingsStore.prevPage"
+          @click="recordingsStore.prevPage(route.params.systemID, route.params.talkgroupID)"
           :disabled="recordingsStore.page === 1"
       >
         Previous
@@ -79,7 +92,7 @@ onMounted(async () => {
 
       <button
           class="px-4 py-2 bg-[var(--panel)] rounded hover:bg-gray-700"
-          @click="recordingsStore.nextPage"
+          @click="recordingsStore.nextPage(route.params.systemID, route.params.talkgroupID)"
           :disabled="recordingsStore.page === recordingsStore.totalPages"
       >
         Next
@@ -87,3 +100,4 @@ onMounted(async () => {
     </div>
   </div>
 </template>
+

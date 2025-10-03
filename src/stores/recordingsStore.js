@@ -27,7 +27,7 @@ export const useRecordingsStore = defineStore("recordings", {
             // Will cause too many requests if not limited by system/talkgroup
             return [];
         },
-        async fetchRecordingsByTalkgroup(systemID = systemsStore.currentSystemID, talkgroupID = talkgroupsStore.currentTalkgroupID, page = 1) {
+        async fetchRecordingsByTalkgroup(systemID, talkgroupID, page = 1) {
             if (!systemID || !talkgroupID) return;
 
             const res = await axios.get(
@@ -35,14 +35,21 @@ export const useRecordingsStore = defineStore("recordings", {
                 { params: { page, limit: this.limit } }
             );
 
-            // Update state, override existing recordings for this talkgroup
-            this.recordings = this.recordings.filter(r => !(r.systemID == systemID && r.talkgroupID == talkgroupID));
+            // Only replace after new recordings are fetched
             const fetchedRecordings = res.data.recordings.map(r => ({ ...r, systemID, talkgroupID }));
-            this.recordings.push(...fetchedRecordings);
+
+            // Replace the array in one step
+            this.recordings = [
+                ...this.recordings.filter(r => !(r.systemID === systemID && r.talkgroupID === talkgroupID)),
+                ...fetchedRecordings
+            ];
+
             this.totalPages = res.data.totalPages;
             this.page = page;
+
             return this.getRecordingsByTalkgroup(systemID, talkgroupID);
         },
+
         async getOrFetchRecordingsByTalkgroup(systemID, talkgroupID) {
             let recordings = this.getRecordingsByTalkgroup(systemID, talkgroupID);
             if (recordings.length) return recordings;
@@ -59,24 +66,21 @@ export const useRecordingsStore = defineStore("recordings", {
             await this.fetchRecordingsByTalkgroup(systemID, talkgroupID);
             return this.getRecordingByID(recordingID);
         },
-        async nextPage() {
+        async nextPage(systemID, talkgroupID) {
             if (this.page < this.totalPages) {
-                await this.fetchRecordings(this.page + 1);
+                await this.fetchRecordingsByTalkgroup(systemID, talkgroupID, this.page + 1);
             }
         },
-        async prevPage() {
+
+        async prevPage(systemID, talkgroupID) {
             if (this.page > 1) {
-                await this.fetchRecordings(this.page - 1);
+                await this.fetchRecordingsByTalkgroup(systemID, talkgroupID, this.page - 1);
             }
         },
         getAudioUrl(recordingID) {
-            const systemsStore = useSystemsStore();
-            const talkgroupsStore = useTalkgroupsStore();
-
-            // Check for null -> This prevents constructing invalid URLs
-            if (!systemsStore.currentSystemID || !talkgroupsStore.currentTalkgroupID || !recordingID) return null;
-
-            return `${import.meta.env.VITE_API_URL}/systems/${systemsStore.currentSystemID}/talkgroups/${talkgroupsStore.currentTalkgroupID}/recordings/${recordingID}/audio`;
-        },
+            if (!recordingID) return null;
+            return `${import.meta.env.VITE_API_URL}/recordings/${recordingID}/audio`;
+        }
+,
     },
 });

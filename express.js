@@ -103,7 +103,7 @@ app.get("/api/systems/:systemID/talkgroups/:talkgroupID/recordings", async (req,
 });
 
 
-app.get("/api/systems/:systemID/talkgroups/:talkgroupID/recordings/:recordingID/audio", async (req, res) => {
+app.get("/api/recordings/:recordingID/audio", async (req, res) => {
     const { recordingID } = req.params;
 
     const [rows] = await db.execute(
