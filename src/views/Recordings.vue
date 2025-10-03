@@ -1,5 +1,5 @@
 <script setup>
-import {onMounted, ref, nextTick, computed} from "vue";
+import {onMounted, ref, nextTick, computed, watch} from "vue";
 import {useSystemsStore} from "../stores/systemsStore";
 import {useTalkgroupsStore} from "../stores/talkgroupsStore";
 import {useRecordingsStore} from "../stores/recordingsStore";
@@ -31,22 +31,24 @@ const applyVolume = () => {
 
 // recordings tied to current system/talkgroup
 const recordings = computed(() =>
-    recordingsStore.getRecordingsByTalkgroup(
-        route.params.talkgroupID
-    )
+    recordingsStore.getRecordingsByTalkgroup(route.params.talkgroupID)
 );
+
+// re-apply volume when recordings list changes (pagination reload)
+watch(recordings, () => {
+  applyVolume();
+});
 
 onMounted(async () => {
   currentSystem.value = await systemsStore.getOrFetchSystem(route.params.systemID);
   currentTalkgroup.value = await talkgroupsStore.getOrFetchTalkgroup(
       route.params.talkgroupID
   );
-  await recordingsStore.fetchRecordingsByTalkgroup(
-      route.params.talkgroupID
-  );
+  await recordingsStore.fetchRecordingsByTalkgroup(route.params.talkgroupID);
   applyVolume();
 });
 </script>
+
 
 
 <template>
