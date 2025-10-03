@@ -1,9 +1,9 @@
 <script setup>
-import { onMounted, ref, nextTick, computed } from "vue";
-import { useSystemsStore } from "../stores/systemsStore";
-import { useTalkgroupsStore } from "../stores/talkgroupsStore";
-import { useRecordingsStore } from "../stores/recordingsStore";
-import { useRoute } from "vue-router";
+import {onMounted, ref, nextTick, computed} from "vue";
+import {useSystemsStore} from "../stores/systemsStore";
+import {useTalkgroupsStore} from "../stores/talkgroupsStore";
+import {useRecordingsStore} from "../stores/recordingsStore";
+import {useRoute} from "vue-router";
 
 const systemsStore = useSystemsStore();
 const talkgroupsStore = useTalkgroupsStore();
@@ -44,7 +44,6 @@ onMounted(async () => {
       route.params.talkgroupID
   );
   await recordingsStore.fetchRecordingsByTalkgroup(
-      route.params.systemID,
       route.params.talkgroupID
   );
   applyVolume();

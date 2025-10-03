@@ -27,11 +27,11 @@ export const useRecordingsStore = defineStore("recordings", {
             // Will cause too many requests if not limited by system/talkgroup
             return [];
         },
-        async fetchRecordingsByTalkgroup(systemID, talkgroupID, page = 1) {
-            if (!systemID || !talkgroupID) return;
+        async fetchRecordingsByTalkgroup(talkgroupID, page = 1) {
+            if (!talkgroupID) return;
 
             const res = await axios.get(
-                `${import.meta.env.VITE_API_URL}/systems/${systemID}/talkgroups/${talkgroupID}/recordings`,
+                `${import.meta.env.VITE_API_URL}/talkgroups/${talkgroupID}/recordings`,
                 { params: { page, limit: this.limit } }
             );
 
@@ -55,7 +55,7 @@ export const useRecordingsStore = defineStore("recordings", {
             if (recordings.length) return recordings;
 
             // If not found in state, fetch from server
-            await this.fetchRecordingsByTalkgroup(systemID, talkgroupID);
+            await this.fetchRecordingsByTalkgroup(talkgroupID);
             return this.getRecordingsByTalkgroup(systemID, talkgroupID);
         },
         async getOrFetchRecording(systemID, talkgroupID, recordingID) {
@@ -63,18 +63,18 @@ export const useRecordingsStore = defineStore("recordings", {
             if (recording) return recording;
 
             // If not found in state, fetch recordings for the talkgroup and look again
-            await this.fetchRecordingsByTalkgroup(systemID, talkgroupID);
+            await this.fetchRecordingsByTalkgroup(talkgroupID);
             return this.getRecordingByID(recordingID);
         },
         async nextPage(systemID, talkgroupID) {
             if (this.page < this.totalPages) {
-                await this.fetchRecordingsByTalkgroup(systemID, talkgroupID, this.page + 1);
+                await this.fetchRecordingsByTalkgroup(talkgroupID, this.page + 1);
             }
         },
 
         async prevPage(systemID, talkgroupID) {
             if (this.page > 1) {
-                await this.fetchRecordingsByTalkgroup(systemID, talkgroupID, this.page - 1);
+                await this.fetchRecordingsByTalkgroup(talkgroupID, this.page - 1);
             }
         },
         getAudioUrl(recordingID) {

@@ -1,30 +1,26 @@
 import express from "express";
 import mysql from "mysql2/promise";
-import { createServer } from "http";
-import { Server } from "socket.io";
+import {createServer} from "http";
+import {Server} from "socket.io";
 import chokidar from "chokidar";
 import path from "path";
 import dotenv from "dotenv";
-dotenv.config();
 import cors from "cors";
 import morgan from "morgan";
 
+const RECORDINGS_DIR = "C:\\ProScan\\Recordings";
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer);
 
-const RECORDINGS_DIR = "C:\\ProScan\\Recordings";
+dotenv.config();
 
 // Watcher setup
 const watcher = chokidar.watch(RECORDINGS_DIR, {
-    persistent: true,
-    ignoreInitial: false,
-    depth: 5,
+    persistent: true, ignoreInitial: false, depth: 5,
 });
 
 // MariaDB pool
-
-
 const db = await mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
@@ -35,81 +31,110 @@ const db = await mysql.createPool({
     queueLimit: 0,
 });
 
-
+// --- Middleware ---
 app.use(express.json());
 app.use(cors());
 app.use(morgan("dev"));
+
+
 // --- API Endpoints ---
+
+// SYSTEMS API
+
+// Get all systems
 app.get("/api/systems", async (req, res) => {
     const [systems] = await db.execute("SELECT * FROM systems");
     res.json(systems);
 });
 
+// Get a specific system by ID
 app.get("/api/systems/:id", async (req, res) => {
     const [systems] = await db.execute("SELECT * FROM systems WHERE id = ?", [req.params.id]);
     if (!systems.length) return res.sendStatus(404);
     res.json(systems[0]);
 });
 
+// Get all talkgroups for a specific system
 app.get("/api/systems/:id/talkgroups", async (req, res) => {
-    const [talkgroups] = await db.execute(
-        "SELECT * FROM talkgroups WHERE system_id = ?",
-        [req.params.id]
-    );
+    const [talkgroups] = await db.execute("SELECT * FROM talkgroups WHERE system_id = ?", [req.params.id]);
     res.json(talkgroups);
 });
 
+// Get a specific talkgroup by system ID and talkgroup ID
+// Deprecated: use /api/talkgroups/:talkgroupID instead
 app.get("/api/systems/:systemID/talkgroups/:talkgroupID", async (req, res) => {
-    const { systemID, talkgroupID } = req.params;
-    const [talkgroups] = await db.execute(
-        "SELECT * FROM talkgroups WHERE system_id = ? AND id = ?",
-        [systemID, talkgroupID]
-    );
-    if (!talkgroups.length) return res.sendStatus(404);
-    res.json(talkgroups[0]);
+    return res.status(400).json({error: "Use /talkgroups/:talkgroupID instead"});
+    // const {systemID, talkgroupID} = req.params;
+    // const [talkgroups] = await db.execute("SELECT * FROM talkgroups WHERE system_id = ? AND id = ?", [systemID, talkgroupID]);
+    // if (!talkgroups.length) return res.sendStatus(404);
+    // res.json(talkgroups[0]);
 });
 
 
 // --- Serve recordings for a talkgroup ---
-app.get("/api/systems/:systemID/talkgroups/:talkgroupID/recordings", async (req, res) => {
-    const { systemID, talkgroupID } = req.params;
+app.get("/api/talkgroups/:talkgroupID/recordings", async (req, res) => {
+    const {talkgroupID} = req.params;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
     try {
         // Get total count for pagination
-        const [countResult] = await db.execute(
-            "SELECT COUNT(*) as total FROM recordings WHERE talkgroup_id = ?",
-            [talkgroupID]
-        );
+        const [countResult] = await db.execute("SELECT COUNT(*) as total FROM recordings WHERE talkgroup_id = ?", [talkgroupID]);
         const totalPages = Math.ceil(countResult[0].total / limit);
-
         // Get recordings
-        const [recordings] = await db.execute(
-            "SELECT * FROM recordings WHERE talkgroup_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
-            [talkgroupID, limit, offset]
-        );
-
+        const [recordings] = await db.execute("SELECT * FROM recordings WHERE talkgroup_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?", [talkgroupID, limit, offset]);
         res.json({
-            recordings,
-            page,
-            totalPages
+            recordings, page, totalPages
         });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: "Server error" });
+        res.status(500).json({error: "Server error"});
     }
 });
 
 
-app.get("/api/recordings/:recordingID/audio", async (req, res) => {
-    const { recordingID } = req.params;
+// TALKGROUPS API
 
-    const [rows] = await db.execute(
-        "SELECT folder_path, filename FROM recordings WHERE id = ?",
-        [recordingID]
-    );
+
+// Get all talkgroups
+app.get("/api/talkgroups", async (req, res) => {
+    const [talkgroups] = await db.execute("SELECT * FROM talkgroups");
+    res.json(talkgroups);
+});
+
+// Get a specific talkgroup by ID (PK)
+app.get("/api/talkgroups/:talkgroupID", async (req, res) => {
+    const {talkgroupID} = req.params;
+    const [talkgroups] = await db.execute("SELECT * FROM talkgroups WHERE id = ?", [talkgroupID]);
+    if (!talkgroups.length) return res.sendStatus(404);
+    res.json(talkgroups[0]);
+});
+
+
+// RECORDINGS API
+
+
+// Disabled
+app.get("/api/recordings", async (req, res) => {
+    return res.status(400).json({error: "Use /systems/:systemID/talkgroups/:talkgroupID/recordings instead"});
+    // const [recordings] = await db.execute("SELECT * FROM recordings ORDER BY created_at DESC LIMIT 100");
+    // res.json(recordings);
+});
+
+// Get a specific recording by ID
+app.get("/api/recordings/:recordingID", async (req, res) => {
+    const {recordingID} = req.params;
+    const [recordings] = await db.execute("SELECT * FROM recordings WHERE id = ?", [recordingID]);
+    if (!recordings.length) return res.sendStatus(404);
+    res.json(recordings[0]);
+});
+
+// Stream audio file for a recording
+app.get("/api/recordings/:recordingID/audio", async (req, res) => {
+    const {recordingID} = req.params;
+
+    const [rows] = await db.execute("SELECT folder_path, filename FROM recordings WHERE id = ?", [recordingID]);
 
     if (!rows.length) return res.sendStatus(404);
 
@@ -132,50 +157,73 @@ app.get("/api/recordings/:recordingID/audio", async (req, res) => {
 httpServer.listen(3000, () => console.log("Server running on http://localhost:3000"));
 
 
-// --- Watch folder for new recordings ---
+/// --- Watch folder for new recordings ---
 watcher.on("add", async (filepath) => {
     try {
         const parsed = path.parse(filepath);
         const filename = parsed.base;
 
         const segments = filepath.split(path.sep);
-        // ...\Recordings\[DATE]\[Favorite]\[SYSTEM]\[TG ID]\File
+        // ...\Recordings\[DATE]\[Favorite]\[SYSTEM]\[TALKGROUP_ID]\File
         const dateFolder = segments[segments.length - 5];
         const favorite = segments[segments.length - 4];
         const systemName = segments[segments.length - 3];
-        const tgSegment = segments[segments.length - 2];
-        const talkgroupId = parseInt(tgSegment, 10);
+        const tgidSegment = segments[segments.length - 2];
+        const tgid = parseInt(tgidSegment, 10);
         const folderPath = path.join(...segments.slice(0, segments.length - 1));
 
-        // console.log({ dateFolder, favorite, systemName, talkgroupId, folderPath, filename });
+        // --- Insert or get system safely ---
+        const [systemResult] = await db.execute(
+            `INSERT INTO systems (name)
+             VALUES (?)
+             ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)`,
+            [systemName]
+        );
+        const system_id = systemResult.insertId;
 
-        // --- Insert system safely ---
-        await db.execute("INSERT IGNORE INTO systems (name) VALUES (?)", [systemName]);
-        const [systemRows] = await db.execute("SELECT id FROM systems WHERE name = ?", [systemName]);
-        const systemId = systemRows[0].id;
-
-        // --- Insert talkgroup safely ---
-        const safeTalkgroupId = !isNaN(talkgroupId) ? talkgroupId : null;
-        if (safeTalkgroupId !== null) {
-            await db.execute(
-                "INSERT IGNORE INTO talkgroups (id, system_id, name) VALUES (?, ?, ?)",
-                [safeTalkgroupId, systemId, `Talkgroup ${safeTalkgroupId}`]
-            );
-        } else {
-            console.warn("Invalid talkgroup ID:", tgSegment);
+        // --- Insert or get talkgroup safely ---
+        if (isNaN(tgid)) {
+            console.warn("Invalid talkgroup ID:", tgidSegment);
+            return;
         }
 
-        // --- Insert recording ---
-        await db.execute(
-            "INSERT INTO recordings (talkgroup_id, folder_path, filename, system_id) VALUES (?, ?, ?, ?)",
-            [safeTalkgroupId, folderPath, filename, systemId]
+        const [tgResult] = await db.execute(
+            `INSERT INTO talkgroups (tgid, system_id, name)
+             VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)`,
+            [tgid, system_id, `Talkgroup ${tgid}`]
+        );
+        const talkgroup_id = tgResult.insertId;
+
+        // --- Insert recording if it doesn't already exist ---
+        const [existing] = await db.execute(
+            "SELECT id FROM recordings WHERE folder_path = ? AND filename = ? AND talkgroup_id = ? AND system_id = ?",
+            [folderPath, filename, talkgroup_id, system_id]
         );
 
+        var recording_id;
+        if (existing.length) {
+            recording_id = existing[0].id; // Already exists
+        } else {
+            const [insertResult] = await db.execute(
+                `INSERT INTO recordings (talkgroup_id, system_id, folder_path, filename)
+                 VALUES (?, ?, ?, ?)`,
+                [talkgroup_id, system_id, folderPath, filename]
+            );
+            recording_id = insertResult.insertId;
+            console.log(`New recording added: ${filepath} (ID: ${recording_id})`);
+        }
+
         // --- Notify frontend ---
-        io.emit("new-recording", { talkgroupId: safeTalkgroupId, folderPath, filename });
+        io.emit("new-recording", {
+            talkgroup_id,
+            tgid,
+            system_id,
+            folderPath,
+            filename
+        });
+
     } catch (err) {
         console.error("Watcher error:", err);
     }
 });
-
-

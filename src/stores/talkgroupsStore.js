@@ -27,6 +27,14 @@ export const useTalkgroupsStore = defineStore("talkgroups", {
             return this.talkgroups;
         },
 
+        async fetchTalkgroup(talkgroupID) {
+            const res = await axios.get(`${import.meta.env.VITE_API_URL}/talkgroups/${talkgroupID}`);
+            const idx = this.talkgroups.findIndex(tg => tg.id === res.data.id);
+            if (idx >= 0) this.talkgroups[idx] = res.data;
+            else this.talkgroups.push(res.data);
+            return res.data;
+        },
+
         async fetchTalkgroupsBySystem(systemID) {
 
             const res = await axios.get(`${import.meta.env.VITE_API_URL}/systems/${systemID}/talkgroups`);
@@ -46,14 +54,10 @@ export const useTalkgroupsStore = defineStore("talkgroups", {
         },
 
         // Get a talkgroup from state or fetch from server if missing
-        async getOrFetchTalkgroup(systemID, talkgroupID) {
-            let tg = this.getTalkgroup(systemID, talkgroupID);
+        async getOrFetchTalkgroup(talkgroupID) {
+            let tg = this.talkgroups.find(tg => tg.id === talkgroupID);
             if (tg) return tg;
-
-            const res = await axios.get(`${import.meta.env.VITE_API_URL}/systems/${systemID}/talkgroups/${talkgroupID}`);
-            const newTG = { ...res.data, systemID };
-            this.talkgroups.push(newTG);
-            return newTG;
+            return await this.fetchTalkgroup(talkgroupID);
         }
     }
 });
