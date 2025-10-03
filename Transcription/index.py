@@ -26,14 +26,9 @@ def transcribe_file(file_path):
 def connect():
     print("Connected to Node server")
 
-@sio.on("request-transcription")
+@sio.on("transcription-request")
 def handle_transcription(data):
     print(Fore.GREEN + f"Received transcription request for {data['filename']}" + Style.RESET_ALL)
-    time.sleep(10)
-    sio.emit("transcription-complete", {
-            "recording_id": data["recording_id"],
-            "transcription": "testing 123"
-        })
     file_path = f"{data['folderPath']}\\{data['filename']}"
     transcription_text = transcribe_file(file_path)
     if transcription_text:

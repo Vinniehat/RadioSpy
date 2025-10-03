@@ -49,7 +49,7 @@ socket.on("connect", () => {
 });
 
 // --- Transcriptions (no separate ref needed) ---
-socket.on("new-transcription", (data) => {
+socket.on("transcription:complete", (data) => {
   // Find the recording in the store and update its transcription
   const rec = recordingsStore.recordings.find(r => r.id === data.recording_id);
   if (rec) rec.transcription = data.transcription;
@@ -59,7 +59,7 @@ socket.on("new-transcription", (data) => {
 const requestTranscription = (rec) => {
   if (!rec.transcription) {
     rec.transcription = "Transcription in progress...";
-    socket.emit("request-transcription", {
+    socket.emit("transcription:request", {
       recording_id: rec.id,
       folderPath: rec.folder_path,
       filename: rec.filename

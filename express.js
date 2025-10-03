@@ -7,6 +7,7 @@ import path from "path";
 import dotenv from "dotenv";
 import cors from "cors";
 import morgan from "morgan";
+import * as fs from "node:fs";
 
 const RECORDINGS_DIR = "C:\\ProScan\\Recordings";
 const app = express();
@@ -44,6 +45,14 @@ const io = new Server(httpServer, {
         credentials: true
     }
 });
+// Save original emit
+const originalEmit = io.emit;
+
+// Override
+io.emit = function(event, ...args) {
+    console.log(`[Socket.IO Emit] Event: ${event}, Data:`, args);
+    return originalEmit.call(this, event, ...args);
+};
 
 // --- API Endpoints ---
 
@@ -161,7 +170,7 @@ app.get("/api/recordings/:recordingID/audio", async (req, res) => {
     });
 });
 
-
+// - for Python and Node, : for Node and Vue
 io.on("connection", (socket) => {
     console.log("Socket connected:", socket.id);
 
@@ -175,13 +184,19 @@ io.on("connection", (socket) => {
             console.log(`Transcription saved for recording ${recording_id}`);
 
             // Optionally notify frontend
-            io.emit("new-transcription", {
+            io.emit("transcription:complete", {
                 recording_id,
                 transcription
             });
         } catch (err) {
             console.error("Failed to save transcription:", err);
         }
+    });
+
+    socket.on("transcription:request", (data) => { // From Vue -> Node -> Python
+        console.log("Received transcription request:", data);
+        // Broadcast to other clients (e.g., transcription service)
+        io.emit("transcription-request", data);
     });
 });
 
@@ -229,7 +244,7 @@ watcher.on("add", async (filepath) => {
         );
         const talkgroup_id = tgResult.insertId;
 
-        // --- Insert recording if it doesn't already exist ---
+        // --- Check if recording already exists ---
         const [existing] = await db.execute(
             "SELECT id FROM recordings WHERE folder_path = ? AND filename = ? AND talkgroup_id = ? AND system_id = ?",
             [folderPath, filename, talkgroup_id, system_id]
@@ -241,16 +256,18 @@ watcher.on("add", async (filepath) => {
             return;
         }
 
+        const stats = await fs.promises.stat(filepath);
+
         const [insertResult] = await db.execute(
-            `INSERT INTO recordings (talkgroup_id, system_id, folder_path, filename)
-                 VALUES (?, ?, ?, ?)`,
-            [talkgroup_id, system_id, folderPath, filename]
+            `INSERT INTO recordings (talkgroup_id, system_id, folder_path, filename, created_at)
+                 VALUES (?, ?, ?, ?, ?)`,
+            [talkgroup_id, system_id, folderPath, filename, stats.birthtime]
         );
         let recording_id = insertResult.insertId;
         console.log(`New recording added: ${filepath} (ID: ${recording_id})`);
 
         // --- Notify frontend ---
-        io.emit("new-recording", {
+        io.emit("recording:new", {
             talkgroup_id,
             tgid,
             system_id,
@@ -263,7 +280,7 @@ watcher.on("add", async (filepath) => {
 
         // Check if this talkgroup is set for auto transcription
         if (result.length && result[0].auto_transcribe) {
-            io.emit("request-transcription", { // By sending all id's, you don't have to make an additional query
+            io.emit("transcription-request", { // By sending all id's, you don't have to make an additional query
                 system_id,
                 talkgroup_id,
                 recording_id,
