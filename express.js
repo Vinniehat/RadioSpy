@@ -211,14 +211,12 @@ io.on("connection", (socket) => {
 httpServer.listen(3000, () => console.log("Server running on http://localhost:3000"));
 
 
-/// --- Watch folder for new recordings ---
 watcher.on("add", async (filepath) => {
     try {
         const parsed = path.parse(filepath);
         const filename = parsed.base;
-
         const segments = filepath.split(path.sep);
-        // ...\Recordings\[DATE]\[Favorite]\[SYSTEM]\[TALKGROUP_ID]\File
+
         const dateFolder = segments[segments.length - 5];
         const favorite = segments[segments.length - 4];
         const systemName = segments[segments.length - 3];
@@ -231,58 +229,87 @@ watcher.on("add", async (filepath) => {
             return;
         }
 
-        // --- Get or insert system (3-query method) ---
-        let [systems] = await db.execute(
-            `SELECT * FROM systems WHERE name = ?`,
-            [systemName]
-        );
+        const waitForFileReady = async (file, minSize = 10 * 1024, checkInterval = 500, maxRetries = 30) => {
+            let lastSize = -1;
 
-        if (!systems.length) {
-            await db.execute(
-                `INSERT INTO systems (name) VALUES (?)`,
-                [systemName]
-            );
-            [systems] = await db.execute(
-                `SELECT * FROM systems WHERE name = ?`,
-                [systemName]
-            );
+            for (let i = 1; i <= maxRetries; i++) {
+                try {
+                    const stats = await fs.promises.stat(file);
+
+                    if (stats.size === 0) {
+                        // if (i % 4 === 0) console.log(`[FileCheck] Waiting for file to start writing: ${file}`);
+                    } else if (stats.size < minSize) {
+                        // if (i % 4 === 0) console.log(`[FileCheck] Waiting for file to reach min size (${stats.size} < ${minSize} bytes): ${file}`);
+                    } else if (stats.size === lastSize) {
+                        // console.log(`[FileCheck] File ready: ${file} (${stats.size} bytes)`);
+                        return stats; // file finished writing
+                    }
+
+                    lastSize = stats.size;
+
+                } catch (err) {
+                    if (err.code !== "ENOENT") throw err; // rethrow unexpected errors
+                    // Check if file does not exist
+                    if (err.code === "ENOENT" && i === 1) {
+                        console.warn(`[FileCheck] File not found on first check, it might have been moved or deleted: ${file}`);
+                        return null; // file was deleted/moved before we could check
+                    }
+                    // if (i % 4 === 0) console.log(`[FileCheck] File not found, waiting: ${file}`);
+
+                }
+
+                await new Promise(r => setTimeout(r, checkInterval));
+            }
+
+            console.log(`[FileCheck] File did not stabilize, skipping: ${file}`);
+            return null;
+        };
+
+
+
+        const stats = await waitForFileReady(filepath);
+        if (!stats) {
+            console.log(`Skipping small or incomplete file: ${filepath}`);
+            return;
         }
-        const systemRow = systems[0];
-        const systemID = systemRow.id;
 
-        // --- Get or insert talkgroup (3-query method) ---
+        // --- Get or insert system ---
+        let [systems] = await db.execute(`SELECT * FROM systems WHERE name = ?`, [systemName]);
+        if (!systems.length) {
+            await db.execute(`INSERT INTO systems (name) VALUES (?)`, [systemName]);
+            [systems] = await db.execute(`SELECT * FROM systems WHERE name = ?`, [systemName]);
+        }
+        const systemID = systems[0].id;
+
+        // --- Get or insert talkgroup ---
         let [talkgroups] = await db.execute(
             `SELECT * FROM talkgroups WHERE tgid = ? AND system_id = ?`,
             [tgid, systemID]
         );
-
         if (!talkgroups.length) {
             await db.execute(
                 `INSERT INTO talkgroups (tgid, system_id, name) VALUES (?, ?, ?)`,
-                [tgid, system_id, `Talkgroup ${tgid}`]
+                [tgid, systemID, `Talkgroup ${tgid}`]
             );
             [talkgroups] = await db.execute(
                 `SELECT * FROM talkgroups WHERE tgid = ? AND system_id = ?`,
-                [tgid, system_id]
+                [tgid, systemID]
             );
         }
-        const talkgroupRow = talkgroups[0];
-        const talkgroupID = talkgroupRow.id;
+        const talkgroupID = talkgroups[0].id;
+        const autoTranscribe = talkgroups[0].auto_transcribe;
 
-        // --- Check if recording already exists ---
+        // --- Check if recording exists ---
         const [existing] = await db.execute(
-            `SELECT * FROM recordings
-             WHERE folder_path = ? AND filename = ? AND talkgroup_id = ? AND system_id = ?`,
+            `SELECT * FROM recordings WHERE folder_path = ? AND filename = ? AND talkgroup_id = ? AND system_id = ?`,
             [folderPath, filename, talkgroupID, systemID]
         );
-
         if (existing.length) {
             console.log(`Recording already exists in DB: ${filepath}`);
             return;
         }
 
-        const stats = await fs.promises.stat(filepath);
-
+        // --- Insert recording ---
         await db.execute(
             `INSERT INTO recordings (talkgroup_id, system_id, folder_path, filename, created_at)
              VALUES (?, ?, ?, ?, ?)`,
@@ -293,21 +320,15 @@ watcher.on("add", async (filepath) => {
             `SELECT * FROM recordings WHERE folder_path = ? AND filename = ? AND talkgroup_id = ? AND system_id = ?`,
             [folderPath, filename, talkgroupID, systemID]
         );
-        const recordingRow = newRecRows[0];
-        const recordingID = recordingRow.id;
+        const recordingID = newRecRows[0].id;
 
-        console.log(`New recording added: ${filepath} (ID: ${recordingRow.id})`);
+        console.log(`New recording added: ${filepath} (ID: ${recordingID})`);
 
         // --- Notify frontend ---
-        io.emit("recording:new", {
-            ...recordingRow,
-            tgid,
-            systemID,
-            talkgroupID,
-        });
+        io.emit("recording:new", newRecRows[0]);
 
-        // --- Auto-transcribe check ---
-        if (talkgroupRow.auto_transcribe) {
+        // --- Auto-transcribe if enabled ---
+        if (autoTranscribe) {
             io.emit("transcription-request", {
                 systemID,
                 talkgroupID,
@@ -321,3 +342,5 @@ watcher.on("add", async (filepath) => {
         console.error("Watcher error:", err);
     }
 });
+
+

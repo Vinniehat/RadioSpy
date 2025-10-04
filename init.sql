@@ -1,8 +1,8 @@
 use radiospy;
 
 DROP TABLE IF EXISTS recordings;
-# DROP TABLE IF EXISTS talkgroups;
-# DROP TABLE IF EXISTS systems;
+-- # DROP TABLE IF EXISTS talkgroups;
+-- # DROP TABLE IF EXISTS systems;
 
 -- ----------------------
 -- Systems Table

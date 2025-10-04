@@ -30,25 +30,27 @@ export const useRecordingsStore = defineStore("recordings", {
         async fetchRecordingsByTalkgroup(talkgroupID, page = 1) {
             if (!talkgroupID) return;
 
-            const res = await axios.get(
-                `${import.meta.env.VITE_API_URL}/talkgroups/${talkgroupID}/recordings`,
-                { params: { page, limit: this.limit } }
-            );
+            const res = await axios.get(`${import.meta.env.VITE_API_URL}/talkgroups/${talkgroupID}/recordings`, {
+                params: { page, limit: this.limit }
+            });
 
-            // Only replace after new recordings are fetched
-            const fetchedRecordings = res.data.recordings.map(r => ({ ...r, talkgroupID }));
+            if (!res.data.recordings) return;
 
-            // Replace the array in one step
+            // normalize the key
+            const fetchedRecordings = res.data.recordings.map(r => ({ ...r, talkgroupID: +talkgroupID }));
+
+            // remove old recordings for this talkgroup and append new ones
             this.recordings = [
-                ...this.recordings.filter(r => !(r.talkgroupID === talkgroupID)),
+                ...this.recordings.filter(r => +r.talkgroupID !== +talkgroupID),
                 ...fetchedRecordings
             ];
 
             this.totalPages = res.data.totalPages;
             this.page = page;
-
+            
             return this.getRecordingsByTalkgroup(talkgroupID);
         },
+
 
         async getOrFetchRecordingsByTalkgroup(talkgroupID) {
             let recordings = this.getRecordingsByTalkgroup(systemID, talkgroupID);
@@ -58,7 +60,7 @@ export const useRecordingsStore = defineStore("recordings", {
             await this.fetchRecordingsByTalkgroup(talkgroupID);
             return this.getRecordingsByTalkgroup(talkgroupID);
         },
-        async getOrFetchRecording(recordingID) {
+        async getOrFetchRecording(recordingID, talkgroupID) {
             let recording = this.getRecordingByID(recordingID);
             if (recording) return recording;
 

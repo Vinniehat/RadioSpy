@@ -53,6 +53,19 @@ socket.on("transcription:complete", (data) => {
   if (rec) rec.transcription = data.transcription;
 });
 
+socket.on("recording:new", (data) => {
+  // If the new recording belongs to the current talkgroup, fetch recordings again
+  console.log("New recording received via socket:", data);
+  // No need to check if system and talkgroup exist in stores since an event will be triggered separately if new ones are added
+  if (data.system_id == route.params.systemID && data.talkgroup_id == route.params.talkgroupID) {
+    console.log("New recording belongs to current talkgroup, fetching...");
+    recordingsStore.getOrFetchRecording(data.id, data.talkgroup_id).then(() => {
+      console.log("Fetched new recording:", data.id);
+      applyVolume();
+    });
+  }
+});
+
 // --- Request transcription manually ---
 const requestTranscription = (rec) => {
   if (!rec.transcription) {
