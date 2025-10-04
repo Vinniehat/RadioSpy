@@ -40,7 +40,7 @@ app.use(morgan("dev"));
 // when creating the io server
 const io = new Server(httpServer, {
     cors: {
-        origin: "http://localhost:5173", // <-- your frontend URL
+        origin: "http://localhost:5175", // <-- your frontend URL
         methods: ["GET", "POST"],
         credentials: true
     }
@@ -164,10 +164,15 @@ app.get("/api/recordings/:recordingID/audio", async (req, res) => {
 
     res.sendFile(fullPath, (err) => {
         if (err) {
-            console.error("Failed to send file:", err);
-            res.sendStatus(500);
+            if (!res.headersSent) {
+                console.error("Failed to send file:", err);
+                res.sendStatus(500);
+            } else {
+                console.error("Headers already sent, error:", err);
+            }
         }
     });
+
 });
 
 // - for Python and Node, : for Node and Vue
@@ -175,17 +180,17 @@ io.on("connection", (socket) => {
     console.log("Socket connected:", socket.id);
 
     socket.on("transcription-complete", async (data) => {
-        const { recording_id, transcription } = data;
+        const { recordingID, transcription } = data;
         try {
             await db.execute(
                 "UPDATE recordings SET transcription = ? WHERE id = ?",
-                [transcription, recording_id]
+                [transcription, recordingID]
             );
-            console.log(`Transcription saved for recording ${recording_id}`);
+            console.log(`Transcription saved for recording ${recordingID}`);
 
             // Optionally notify frontend
             io.emit("transcription:complete", {
-                recording_id,
+                recordingID,
                 transcription
             });
         } catch (err) {
@@ -221,36 +226,56 @@ watcher.on("add", async (filepath) => {
         const tgid = parseInt(tgidSegment, 10);
         const folderPath = path.join(...segments.slice(0, segments.length - 1));
 
-        // --- Insert or get system safely ---
-        const [systemResult] = await db.execute(
-            `INSERT INTO systems (name)
-             VALUES (?)
-             ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)`,
-            [systemName]
-        );
-        const system_id = systemResult.insertId;
-
-        // --- Insert or get talkgroup safely ---
         if (isNaN(tgid)) {
             console.warn("Invalid talkgroup ID:", tgidSegment);
             return;
         }
 
-        const [tgResult] = await db.execute(
-            `INSERT INTO talkgroups (tgid, system_id, name)
-             VALUES (?, ?, ?)
-             ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)`,
-            [tgid, system_id, `Talkgroup ${tgid}`]
+        // --- Get or insert system (3-query method) ---
+        let [systems] = await db.execute(
+            `SELECT * FROM systems WHERE name = ?`,
+            [systemName]
         );
-        const talkgroup_id = tgResult.insertId;
+
+        if (!systems.length) {
+            await db.execute(
+                `INSERT INTO systems (name) VALUES (?)`,
+                [systemName]
+            );
+            [systems] = await db.execute(
+                `SELECT * FROM systems WHERE name = ?`,
+                [systemName]
+            );
+        }
+        const systemRow = systems[0];
+        const systemID = systemRow.id;
+
+        // --- Get or insert talkgroup (3-query method) ---
+        let [talkgroups] = await db.execute(
+            `SELECT * FROM talkgroups WHERE tgid = ? AND system_id = ?`,
+            [tgid, systemID]
+        );
+
+        if (!talkgroups.length) {
+            await db.execute(
+                `INSERT INTO talkgroups (tgid, system_id, name) VALUES (?, ?, ?)`,
+                [tgid, system_id, `Talkgroup ${tgid}`]
+            );
+            [talkgroups] = await db.execute(
+                `SELECT * FROM talkgroups WHERE tgid = ? AND system_id = ?`,
+                [tgid, system_id]
+            );
+        }
+        const talkgroupRow = talkgroups[0];
+        const talkgroupID = talkgroupRow.id;
 
         // --- Check if recording already exists ---
         const [existing] = await db.execute(
-            "SELECT id FROM recordings WHERE folder_path = ? AND filename = ? AND talkgroup_id = ? AND system_id = ?",
-            [folderPath, filename, talkgroup_id, system_id]
+            `SELECT * FROM recordings
+             WHERE folder_path = ? AND filename = ? AND talkgroup_id = ? AND system_id = ?`,
+            [folderPath, filename, talkgroupID, systemID]
         );
 
-        // Check for existing recording
         if (existing.length) {
             console.log(`Recording already exists in DB: ${filepath}`);
             return;
@@ -258,37 +283,39 @@ watcher.on("add", async (filepath) => {
 
         const stats = await fs.promises.stat(filepath);
 
-        const [insertResult] = await db.execute(
+        await db.execute(
             `INSERT INTO recordings (talkgroup_id, system_id, folder_path, filename, created_at)
-                 VALUES (?, ?, ?, ?, ?)`,
-            [talkgroup_id, system_id, folderPath, filename, stats.birthtime]
+             VALUES (?, ?, ?, ?, ?)`,
+            [talkgroupID, systemID, folderPath, filename, stats.birthtime]
         );
-        let recording_id = insertResult.insertId;
-        console.log(`New recording added: ${filepath} (ID: ${recording_id})`);
+
+        const [newRecRows] = await db.execute(
+            `SELECT * FROM recordings WHERE folder_path = ? AND filename = ? AND talkgroup_id = ? AND system_id = ?`,
+            [folderPath, filename, talkgroupID, systemID]
+        );
+        const recordingRow = newRecRows[0];
+        const recordingID = recordingRow.id;
+
+        console.log(`New recording added: ${filepath} (ID: ${recordingRow.id})`);
 
         // --- Notify frontend ---
         io.emit("recording:new", {
-            talkgroup_id,
+            ...recordingRow,
             tgid,
-            system_id,
-            folderPath,
-            filename
+            systemID,
+            talkgroupID,
         });
 
-        // Technically this is an extra query we don't need all the time since we can tell if a TG has been created this run which defaults to false
-        const [result] = await db.execute(`SELECT auto_transcribe FROM talkgroups WHERE id = ?`, [talkgroup_id]);
-
-        // Check if this talkgroup is set for auto transcription
-        if (result.length && result[0].auto_transcribe) {
-            io.emit("transcription-request", { // By sending all id's, you don't have to make an additional query
-                system_id,
-                talkgroup_id,
-                recording_id,
+        // --- Auto-transcribe check ---
+        if (talkgroupRow.auto_transcribe) {
+            io.emit("transcription-request", {
+                systemID,
+                talkgroupID,
+                recordingID,
                 folderPath,
                 filename
             });
         }
-
 
     } catch (err) {
         console.error("Watcher error:", err);

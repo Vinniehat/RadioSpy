@@ -33,7 +33,7 @@ def handle_transcription(data):
     transcription_text = transcribe_file(file_path)
     if transcription_text:
         sio.emit("transcription-complete", {
-            "recording_id": data["recording_id"],
+            "recordingID": data["recordingID"],
             "transcription": transcription_text
         })
         print(Fore.BLUE + f"Transcription sent for {data['filename']}" + Style.RESET_ALL)
