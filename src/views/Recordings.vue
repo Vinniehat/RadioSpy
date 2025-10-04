@@ -1,12 +1,12 @@
 <script setup>
-import { onMounted, ref, nextTick, computed, watch } from "vue";
-import { useSystemsStore } from "../stores/systemsStore";
-import { useTalkgroupsStore } from "../stores/talkgroupsStore";
-import { useRecordingsStore } from "../stores/recordingsStore";
-import { useRoute } from "vue-router";
-import { useSocket } from "../composables/useSocket";
+import {onMounted, ref, nextTick, computed, watch} from "vue";
+import {useSystemsStore} from "../stores/systemsStore";
+import {useTalkgroupsStore} from "../stores/talkgroupsStore";
+import {useRecordingsStore} from "../stores/recordingsStore";
+import {useRoute} from "vue-router";
+import {useSocket} from "../composables/useSocket";
 import LoadingSpinner from "@/components/LoadingSpinner.vue";
-import { useAppStore } from "@/stores/appStore.js";
+import {useAppStore} from "@/stores/appStore.js";
 
 const systemsStore = useSystemsStore();
 const talkgroupsStore = useTalkgroupsStore();
@@ -15,7 +15,7 @@ const appStore = useAppStore();
 const route = useRoute();
 const currentSystem = ref(null);
 const currentTalkgroup = ref(null);
-const { socket, isConnected } = useSocket();
+const {socket, isConnected} = useSocket();
 
 // --- Volume ---
 const volume = ref(parseFloat(localStorage.getItem("defaultVolume")) || 0.5);
@@ -133,8 +133,9 @@ onMounted(async () => {
   <div>
     <LoadingSpinner v-if="useAppStore().loading"/>
     <div class="p-6">
-      <h1 class="text-3xl font-bold mb-6 text-[var(--primary)]">
-        Recordings for {{ currentSystem?.name }} > {{ currentTalkgroup?.name }}
+      <h1 class="text-3xl font-bold mb-6 text-[var(--primary)] flex items-center space-x-2">
+        <span>Recordings for {{ currentSystem?.name }} > {{ currentTalkgroup?.name }}</span>
+        <span class="w-5 h-5 rounded-full bg-red-500 animate-pulse-full-opacity flex-shrink-0"></span>
       </h1>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -196,3 +197,15 @@ onMounted(async () => {
   </div>
 
 </template>
+
+<style scoped>
+
+@keyframes pulse-full-opacity {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.animate-pulse-full-opacity {
+  animation: pulse-full-opacity 3s infinite;
+}
+</style>
