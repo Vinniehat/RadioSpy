@@ -1,12 +1,12 @@
 <script setup>
-import {onMounted, ref, nextTick, computed, watch} from "vue";
-import {useSystemsStore} from "../stores/systemsStore";
-import {useTalkgroupsStore} from "../stores/talkgroupsStore";
-import {useRecordingsStore} from "../stores/recordingsStore";
-import {useRoute} from "vue-router";
+import { onMounted, ref, nextTick, computed, watch } from "vue";
+import { useSystemsStore } from "../stores/systemsStore";
+import { useTalkgroupsStore } from "../stores/talkgroupsStore";
+import { useRecordingsStore } from "../stores/recordingsStore";
+import { useRoute } from "vue-router";
 import { useSocket } from "../composables/useSocket";
 import LoadingSpinner from "@/components/LoadingSpinner.vue";
-import {useAppStore} from "@/stores/appStore.js";
+import { useAppStore } from "@/stores/appStore.js";
 
 const systemsStore = useSystemsStore();
 const talkgroupsStore = useTalkgroupsStore();
@@ -19,7 +19,6 @@ const { socket, isConnected } = useSocket();
 
 // --- Volume ---
 const volume = ref(parseFloat(localStorage.getItem("defaultVolume")) || 0.5);
-
 const applyVolume = () => {
   nextTick(() => {
     const audioElements = document.querySelectorAll("audio");
@@ -33,40 +32,73 @@ const applyVolume = () => {
   });
 };
 
-// --- Recordings ---
+// --- Queue ---
+const recordingQueue = ref([]);
+let isPlaying = ref(false);
+
+// --- Computed recordings for this talkgroup ---
 const recordings = computed(() =>
     recordingsStore.getRecordingsByTalkgroup(route.params.talkgroupID)
 );
 
-// re-apply volume when recordings list changes (pagination reload)
-watch(recordings, () => {
+// re-apply volume when recordings list changes
+watch(recordings, () => applyVolume());
+
+// --- Play queue ---
+async function playNextInQueue() {
+  if (recordingQueue.value.length === 0) {
+    isPlaying.value = false;
+    return;
+  }
+
+  isPlaying.value = true;
+  const next = recordingQueue.value.shift();
+
+  // Wait until Vue renders the <audio> element
+  await nextTick();
+
+  if (!next.audioRef) {
+    console.warn("Audio element not ready for recording:", next.id);
+    // retry in 200ms
+    setTimeout(playNextInQueue, 200);
+    return;
+  }
+
+  try {
+    await next.audioRef.play();
+  } catch (err) {
+    console.log("Auto-play failed:", err);
+  }
+
+  next.audioRef.onended = () => playNextInQueue();
+}
+
+// --- Socket listeners ---
+socket.on("recording:new", async (data) => {
+  // Ignore recordings not for this system/talkgroup
+  if (+data.system_id !== +route.params.systemID || +data.talkgroup_id !== +route.params.talkgroupID) return;
+
+  // Fetch and add to store
+  const rec = await recordingsStore.getOrFetchRecording(data.id, data.talkgroup_id);
+
+  // Only queue for playback if site-wide live playback is enabled
+  if (appStore.livePlaybackEnabled && !recordingQueue.value.some(r => r.id === rec.id)) {
+    recordingQueue.value.push(rec);
+
+    // Start playback if nothing is playing
+    if (!isPlaying.value) playNextInQueue();
+  }
+
   applyVolume();
 });
 
 
-
-
-// --- Transcriptions (no separate ref needed) ---
+// --- Transcriptions ---
 socket.on("transcription:complete", (data) => {
-  // Find the recording in the store and update its transcription
   const rec = recordingsStore.recordings.find(r => r.id === data.recordingID);
   if (rec) rec.transcription = data.transcription;
 });
 
-socket.on("recording:new", (data) => {
-  // If the new recording belongs to the current talkgroup, fetch recordings again
-  console.log("New recording received via socket:", data);
-  // No need to check if system and talkgroup exist in stores since an event will be triggered separately if new ones are added
-  if (data.system_id == route.params.systemID && data.talkgroup_id == route.params.talkgroupID) {
-    console.log("New recording belongs to current talkgroup, fetching...");
-    recordingsStore.getOrFetchRecording(data.id, data.talkgroup_id).then(() => {
-      console.log("Fetched new recording:", data.id);
-      applyVolume();
-    });
-  }
-});
-
-// --- Request transcription manually ---
 const requestTranscription = (rec) => {
   if (!rec.transcription) {
     rec.transcription = "Transcription in progress...";
@@ -78,18 +110,24 @@ const requestTranscription = (rec) => {
   }
 };
 
-
+// --- On mounted ---
 onMounted(async () => {
   currentSystem.value = await systemsStore.getOrFetchSystem(route.params.systemID);
-  currentTalkgroup.value = await talkgroupsStore.getOrFetchTalkgroup(
-      route.params.talkgroupID
-  );
+  currentTalkgroup.value = await talkgroupsStore.getOrFetchTalkgroup(route.params.talkgroupID);
   await recordingsStore.fetchRecordingsByTalkgroup(route.params.talkgroupID);
+
+  // Auto-start playback if live playback is enabled
+  if (appStore.livePlaybackEnabled && recordingQueue.value.length > 0 && !isPlaying.value) {
+    playNextInQueue();
+  }
+
   appStore.setLoading(false);
   applyVolume();
 });
 
+
 </script>
+
 
 <template>
   <div>
@@ -110,6 +148,7 @@ onMounted(async () => {
           <audio
               v-if="recordingsStore.getAudioUrl(rec.id)"
               :src="recordingsStore.getAudioUrl(rec.id)"
+              :ref="el => rec.audioRef = el"
               controls
               preload="metadata"
               class="w-full mt-2"

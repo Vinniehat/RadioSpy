@@ -9,6 +9,7 @@ import { useAppStore } from "@/stores/appStore.js";
 import LoadingSpinner from "./components/LoadingSpinner.vue";
 
 const appStore = useAppStore();
+appStore.restoreLivePlayback();
 </script>
 
 <style scoped>

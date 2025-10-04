@@ -15,17 +15,36 @@
       Toggle Dark
     </button>
 
+    <button
+        v-if="!appStore.livePlaybackEnabled"
+        class="px-3 py-1 bg-[var(--primary)] text-[var(--bg)] rounded transition
+         hover:bg-[var(--accent)] dark:hover:bg-[var(--primary-light)]"
+        @click="enableLivePlayback"
+    >
+      Start Live Playback
+    </button>
+
+    <span v-else>
+      🔊 Live playback active
+    </span>
+
   </header>
 </template>
 
 <script setup>
 import { useRouter } from 'vue-router';
 import { ref, onMounted } from 'vue';
+import { useAppStore } from '@/stores/appStore.js';
 
 const router = useRouter();
 const dark = ref(false);
+const appStore = useAppStore();
 
-// Initialize based on current HTML class
+// wrap store action in a method for template
+const enableLivePlayback = () => {
+  appStore.enableLivePlayback();
+};
+
 onMounted(() => {
   dark.value = document.documentElement.classList.contains('dark');
 });
