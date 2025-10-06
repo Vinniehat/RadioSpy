@@ -40,7 +40,7 @@ app.use(morgan("dev"));
 // when creating the io server
 const io = new Server(httpServer, {
     cors: {
-        origin: "http://localhost:5175", // <-- your frontend URL
+        origin: "http://localhost:5177", // <-- your frontend URL
         methods: ["GET", "POST"],
         credentials: true
     }
@@ -286,14 +286,19 @@ watcher.on("add", async (filepath) => {
             `SELECT * FROM talkgroups WHERE tgid = ? AND system_id = ?`,
             [tgid, systemID]
         );
-        if (!talkgroups.length) {
+        if (!talkgroups.length) { // If talkgroup doesn't exist, create it
             await db.execute(
-                `INSERT INTO talkgroups (tgid, system_id, name) VALUES (?, ?, ?)`,
-                [tgid, systemID, `Talkgroup ${tgid}`]
+                `INSERT INTO talkgroups (tgid, system_id, name, last_heard) VALUES (?, ?, ?)`,
+                [tgid, systemID, `Talkgroup ${tgid}`, new Date()]
             );
             [talkgroups] = await db.execute(
                 `SELECT * FROM talkgroups WHERE tgid = ? AND system_id = ?`,
                 [tgid, systemID]
+            );
+        } else { // Update last_heard
+            await db.execute(
+                `UPDATE talkgroups SET last_heard = ? WHERE id = ?`,
+                [new Date(), talkgroups[0].id]
             );
         }
         const talkgroupID = talkgroups[0].id;

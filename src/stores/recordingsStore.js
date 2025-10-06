@@ -8,7 +8,7 @@ export const useRecordingsStore = defineStore("recordings", {
         recordings: [],
         page: 1,
         totalPages: 1,
-        limit: 10,
+        limit: 12,
     }),
     getters: {
         getAllRecordings: (state) => {

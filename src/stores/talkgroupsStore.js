@@ -18,6 +18,25 @@ export const useTalkgroupsStore = defineStore("talkgroups", {
         getTalkgroup: (state) => (talkgroupID) => {
             return state.talkgroups.find(tg => tg.systemID == systemID && tg.id == talkgroupID);
         },
+        getLastHeardISO: (state) => (talkgroupID) => {
+            const tg = state.talkgroups.find(tg => tg.id == talkgroupID);
+            return tg ? tg.lastHeard : null;
+        },
+        getLastHeardText : (state) => (talkgroupID) => {
+            // Returns a human-readable "time ago" string for the lastHeard timestamp
+            const tg = state.talkgroups.find(tg => tg.id == talkgroupID);
+            if (!tg || !tg.last_heard) return "Never";
+            const last_heard = new Date(tg.last_heard);
+            const now = new Date();
+            const diffMs = now - last_heard;
+            const diffMins = Math.floor(diffMs / 60000);
+            if (diffMins < 1) return "Just now";
+            if (diffMins < 60) return `${diffMins} minute(s) ago`;
+            const diffHours = Math.floor(diffMins / 60);
+            if (diffHours < 24) return `${diffHours} hour(s) ago`;
+            const diffDays = Math.floor(diffHours / 24);
+            return `${diffDays} day(s) ago`;
+        }
     },
     actions: {
         // Fetch all talkgroups for a system (only if not already in state)
@@ -58,6 +77,10 @@ export const useTalkgroupsStore = defineStore("talkgroups", {
             let tg = this.talkgroups.find(tg => tg.id === talkgroupID);
             if (tg) return tg;
             return await this.fetchTalkgroup(talkgroupID);
+        },
+        async setLastHeard(talkgroupID, last_heard = new Date().toISOString()) {
+            const tg = this.talkgroups.find(tg => tg.id === talkgroupID);
+            if (tg) tg.last_heard = last_heard;
         }
     }
 });
